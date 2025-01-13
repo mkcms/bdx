@@ -1181,7 +1181,7 @@ def search_index(
 
         log(
             (
-                "Warning: {} file(s) are newer than index,"
+                "Warning: Indexed information is outdated for {} file(s),"
                 " run `index` command to re-index"
             ),
             len(outdated_paths_in_index),
@@ -1193,7 +1193,7 @@ def search_index(
 
         log(
             (
-                "Warning: {} file(s) are older than source,"
+                "Warning: Binary file(s) older than source: {},"
                 " re-compile and run `index` command to re-index"
             ),
             len(outdated_binaries),
