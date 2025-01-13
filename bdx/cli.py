@@ -412,6 +412,9 @@ def disass(_directory, index_path, query, num, disassembler):
         except StopIteration:
             break
 
+        if res.symbol_outdated:
+            error("Information outdated, re-index needed")
+
         data = res.asdict()
         data.update(res.dynamic_fields())
 
