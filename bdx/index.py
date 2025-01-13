@@ -1159,19 +1159,21 @@ def search_index(
 
         for i, symbol in enumerate(results):
 
-            if is_symbol_outdated(symbol):
-                outdated_paths_in_index.add(symbol.path)
-
-            if is_binary_outdated(symbol):
-                outdated_binaries.add(symbol.path)
-
-            yield SearchResult(
+            res = SearchResult(
                 i=i,
                 total=results.count,
-                symbol_outdated=False,
-                binary_outdated=False,
+                symbol_outdated=is_symbol_outdated(symbol),
+                binary_outdated=is_binary_outdated(symbol),
                 symbol=symbol,
             )
+
+            if res.symbol_outdated:
+                outdated_paths_in_index.add(symbol.path)
+
+            if res.binary_outdated:
+                outdated_binaries.add(symbol.path)
+
+            yield res
 
     if outdated_paths_in_index:
         for file in outdated_paths_in_index:
