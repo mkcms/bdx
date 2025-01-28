@@ -145,6 +145,35 @@ def test_indexing(fixture_path, tmp_path):
         assert uses_foo.size == 13
 
 
+def test_reindexing(fixture_path, tmp_path):
+    index_path = tmp_path / "index"
+    bin_path = tmp_path / "bin"
+    file = bin_path / "file.c.o"
+    bin_path.mkdir()
+
+    shutil.copy(fixture_path / "toplev.c.o", file)
+    index_binary_directory(bin_path, index_path, IndexingOptions())
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = set(index.search("*:*"))
+        by_name = {x.name: x for x in symbols}
+        assert "top_level_symbol" in by_name
+        assert "CamelCaseSymbol" not in by_name
+
+    shutil.copy(fixture_path / "subdir" / "foo.c.o", file)
+    index_binary_directory(bin_path, index_path, IndexingOptions())
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = set(index.search("*:*"))
+        by_name = {x.name: x for x in symbols}
+        assert "top_level_symbol" not in by_name
+        assert "CamelCaseSymbol" in by_name
+
+    file.unlink()
+    index_binary_directory(bin_path, index_path, IndexingOptions())
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = set(index.search("*:*"))
+        assert not symbols
+
+
 def test_indexing_min_symbol_size(fixture_path, tmp_path):
     index_path = tmp_path / "index"
     for msize in [0, 1, 64, 65]:
