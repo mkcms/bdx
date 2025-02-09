@@ -24,7 +24,9 @@ def log(msg, *args):
                 return os.path.relpath(arg)
 
             if isinstance(arg, Exception):
-                return "\n".join(tb.format_exception(arg))
+                return "\n".join(
+                    tb.format_exception(type(arg), arg, arg.__traceback__)
+                )
 
             return arg
 
