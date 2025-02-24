@@ -392,6 +392,7 @@ def search(_directory, index_path, query, num, format):
     nargs=1,
     default=(
         "objdump -dC "
+        "--no-show-raw-insn "
         "'{path}' "
         "--section '{section}' "
         "--start-address 0x{address:x} --stop-address 0x{endaddress:x}"
