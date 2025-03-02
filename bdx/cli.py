@@ -398,7 +398,7 @@ def search(_directory, index_path, query, num, format):
         "--start-address 0x{address:x} --stop-address 0x{endaddress:x}"
     ),
     show_default=True,
-    metavar='COMMAND',
+    metavar="COMMAND",
 )
 @click.option(
     "-M",
@@ -408,18 +408,20 @@ def search(_directory, index_path, query, num, format):
         "'{}'-placeholders can also be present here."
     ),
     nargs=1,
-    default='',
+    default="",
     show_default=True,
-    metavar='OPTS',
+    metavar="OPTS",
 )
-def disass(_directory, index_path, query, num, disassembler, disassembler_options):
+def disass(
+    _directory, index_path, query, num, disassembler, disassembler_options
+):
     """Search binary directory for symbols."""
     results = search_index(
         index_path=index_path, query=" ".join(query), limit=num
     )
 
     if disassembler_options:
-        disassembler += ' ' + disassembler_options
+        disassembler += " " + disassembler_options
 
     while True:
         try:
