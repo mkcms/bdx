@@ -202,28 +202,39 @@ class CompilationDatabase:
             directory = Path(entry.get("directory", path.parent))
             file = None
             source_file = Path(entry["file"])
-            trace("For source file {}", source_file)
+            found_in = None
 
             if "output" in entry:
                 file = Path(entry["output"])
-                trace("  Found binary file in 'output': {}", file)
+                found_in = "output"
             elif "command" in entry:
                 command = entry["command"]
                 match = re.match(".* -o *([^ ]+).*", command)
                 if match:
                     file = Path(match.group(1))
-                    trace("  Found binary file in 'command': {}", file)
+                    found_in = "command"
             elif "arguments" in entry:
                 args = entry["arguments"]
                 for prev, next in zip(args, args[1:]):
                     if prev == "-o":
                         file = Path(next)
-                        trace("  Found binary file in 'arguments': {}", file)
+                        found_in = "arguments"
                         break
 
             if not file:
                 file = directory / (source_file.stem + ".o")
-                trace("  Assuming {} is binary", file)
+                trace(
+                    "For source file {}: assuming {} is binary",
+                    source_file,
+                    file,
+                )
+            else:
+                trace(
+                    "For source file {}: found binary file in '{}': {}",
+                    source_file,
+                    found_in,
+                    file,
+                )
             if not file.is_absolute():
                 file = directory / file
 
