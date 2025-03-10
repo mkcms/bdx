@@ -1071,6 +1071,54 @@ def index_binary_directory(
     return stats
 
 
+def delete_index(index_path: Path):
+    """Delete index at given path."""
+    if not index_path.exists():
+        log("Index does not exist - not deleting")
+        return
+
+    files_to_remove: list[Path] = []
+    dirs_to_remove: list[Path] = []
+
+    with SymbolIndex.open(index_path, readonly=False) as index:
+        for shard_path in [index.path, *index.shards()]:
+            required_files = [
+                shard_path / "flintlock",
+                shard_path / "iamglass",
+                shard_path / "postlist.glass",
+                shard_path / "termlist.glass",
+            ]
+            optional_files = [
+                shard_path / "docdata.glass",
+            ]
+
+            for file in required_files:
+                if not file.exists():
+                    error(
+                        "Shard file {} does not exist - not deleting database",
+                        file,
+                    )
+
+                files_to_remove.append(file)
+
+            for file in optional_files:
+                if file.exists():
+                    files_to_remove.append(file)
+
+            dirs_to_remove.append(shard_path)
+
+    for file in files_to_remove:
+        debug("Deleting db file: {}", file)
+        file.unlink()
+
+    for dir in dirs_to_remove:
+        debug("Deleting db directory: {}", dir)
+        dir.rmdir()
+
+    debug("Deleting index directory: {}", index_path)
+    index_path.rmdir()
+
+
 @dataclass(frozen=True)
 class SearchResult:
     """A single symbol retrieved from index."""

@@ -18,8 +18,8 @@ import bdx
 from bdx import debug, error, info, log, make_progress_bar, trace
 # fmt: off
 from bdx.binary import BinaryDirectory, find_compilation_database
-from bdx.index import (IndexingOptions, SymbolIndex, index_binary_directory,
-                       search_index)
+from bdx.index import (IndexingOptions, SymbolIndex, delete_index,
+                       index_binary_directory, search_index)
 from bdx.query_parser import QueryParser
 
 # fmt: on
@@ -259,8 +259,22 @@ def cli():
     is_flag=True,
     help="Treat all files as outdated to reindex them.",
 )
-def index(directory, index_path, opt, use_compilation_database, reindex):
+@click.option(
+    "--delete",
+    is_flag=True,
+    help=(
+        "Delete the entire Xapian database before indexing. "
+        "This can significantly speed up indexing if a lot of files "
+        " have been modified/removed."
+    ),
+)
+def index(
+    directory, index_path, opt, use_compilation_database, reindex, delete
+):
     """Index the specified directory."""
+    if delete:
+        delete_index(index_path)
+
     options = IndexingOptions(**dict(opt))
 
     try:

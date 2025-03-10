@@ -55,6 +55,10 @@ Or you can specify the directory to index:
 
 The indexer will only index files changed since last run.
 
+When indexing a large repository when a lot of files have changed, it's often
+better to use `--delete` option, to completely rebuild the index.  Removing
+outdated documents from the database is very slow.
+
 The `index` command also accepts `-o`, `--opt` option which can be used to set
 some indexing settings, e.g. to enable indexing relocations:
 
