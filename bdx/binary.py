@@ -552,7 +552,7 @@ class BinaryDirectory:
         path = self.compilation_database
         if not path:
             msg = (
-                f"compile_commands.json file not found in {path} "
+                f"compile_commands.json file not found in {self.path} "
                 "or any of the parent directories"
             )
             raise BinaryDirectory.CompilationDatabaseNotFoundError(msg)
