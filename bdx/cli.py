@@ -11,9 +11,10 @@ from sys import exit
 from typing import Any, Optional
 
 import click
-from click.shell_completion import CompletionItem
+from click.shell_completion import CompletionItem, shell_complete
 from click.types import BoolParamType, IntRange
-
+from itertools import islice
+import re
 import bdx
 from bdx import debug, error, info, log, make_progress_bar, trace
 # fmt: off
@@ -316,11 +317,66 @@ class SearchOutputFormatParamType(click.Choice):
         return value
 
 
+def _complete_query(
+    ctx: click.Context, param: click.Parameter, incomplete: str
+) -> list[str]:
+    """Generate a list of completions for ``incomplete`` query string."""
+
+    directory = ctx.params["directory"]
+    index_path = ctx.params["index_path"]
+
+    if not directory:
+        directory = default_directory(ctx)
+    if not index_path:
+        index_path = SymbolIndex.default_path(directory)
+
+    query = ctx.params["query"]
+    results: list[str] = []
+
+    if len(query) >= 2 and query[-1] == ":":
+        # Searching specific fields
+        fields = [query[-2]]
+    elif query and incomplete == ":":
+        # Also searching specific fields (no value char is present yet)
+        fields = [query[-1]]
+        incomplete = ""
+    else:
+        fields = [
+            "name",
+            "fullname",
+            "demangled",
+        ]
+
+        # Complete search fields
+        results += [
+            f.name + ":"
+            for f in SymbolIndex.SCHEMA.fields
+            if f.name.startswith(incomplete)
+        ]
+
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        for field in fields:
+            try:
+                results.extend(
+                    [i for i in islice(index.iter_prefix(field, incomplete), 10000)]
+                )
+            except Exception:
+                # Ignore errors in query, e.g. invalid field name
+                pass
+
+    for i, item in enumerate(results):
+        if not re.match("[a-zA-Z0-9/_\\-]+", str(item)):
+            results[i] = f'"{item}"'
+
+    return results
+
+
 @cli.command()
 @_common_options(index_must_exist=True)
 @click.argument(
     "query",
     nargs=-1,
+    shell_complete=_complete_query,
 )
 @click.option(
     "-n",
@@ -387,6 +443,7 @@ def search(_directory, index_path, query, num, format):
 @click.argument(
     "query",
     nargs=-1,
+    shell_complete=_complete_query,
 )
 @click.option(
     "-n",
