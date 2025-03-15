@@ -29,6 +29,11 @@ For optional graph generation (this installs `pygraphviz`):
 
 [xapian][xapian] is required to be installed on the system.
 
+To install shell completion for the `bdx` command provided, put into shell init
+file:
+
+    eval "$(_BDX_COMPLETE=bash_source bdx)" # or `zsh_source` on zsh
+
 ### Getting Xapian ###
 
 You need Xapian Python bindings, you can get them:

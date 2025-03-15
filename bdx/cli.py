@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -18,9 +19,9 @@ import bdx
 from bdx import debug, error, info, log, make_progress_bar, trace
 # fmt: off
 from bdx.binary import BinaryDirectory, find_compilation_database
-from bdx.index import (IndexingOptions, SymbolIndex, delete_index,
-                       index_binary_directory, search_index)
-from bdx.query_parser import QueryParser
+from bdx.index import (IndexingOptions, PathField, SymbolIndex, _OptionalField,
+                       delete_index, index_binary_directory, search_index)
+from bdx.query_parser import QueryParser, Token
 
 # fmt: on
 
@@ -316,11 +317,166 @@ class SearchOutputFormatParamType(click.Choice):
         return value
 
 
+def _should_quote_shell_completion(string: str):
+    match_length = 0
+    for _, matcher in Token.matchers():
+        match = matcher(string)
+        if match:
+            match_length = match[1]
+            break
+
+    if match_length == len(string):
+        return False
+
+    if match_length == len(string) - 1:
+        return string[-1] != "*"
+
+    return True
+
+
+def _complete_paths(index: SymbolIndex, field: str, term: str) -> list[str]:
+    """Generate a list of completions for ``term`` query string."""
+    if term.startswith("/"):
+        return []
+
+    prefix = ""
+    if term.startswith("./"):
+        prefix = "./"
+
+    results = []
+    for p in Path().glob(f"{term}*"):
+        resolved = Path(p).absolute().resolve()
+
+        try:
+            next(index.iter_prefix(field, str(resolved)))
+        except StopIteration:
+            # If the prefix does not exist, don't return this path
+            continue
+
+        if p.is_dir():
+            results.append(str(p) + "/")
+            results.append(str(p) + "/*")
+        else:
+            results.append(str(p))
+
+    return [prefix + i for i in results]
+
+
+def _complete_query(
+    ctx: click.Context, param: click.Parameter, incomplete: str
+) -> list[CompletionItem]:
+    """Generate a list of completions for ``incomplete`` query string."""
+    directory = ctx.params["directory"]
+    index_path = ctx.params["index_path"]
+
+    if not directory:
+        directory = default_directory(ctx)
+    if not index_path:
+        index_path = SymbolIndex.default_path(directory)
+
+    query = ctx.params[param.name] or []
+    results: list[str] = []
+    additional_completions: list[CompletionItem] = []
+    shell = os.environ.get("_BDX_COMPLETE", "").lower()
+
+    # The database term to complete
+    term = incomplete
+
+    # If true, then the user typed a quote before the term and we
+    # should quote all possible term completions
+    quote_each_term = False
+
+    # String to prepend to each generated completion
+    prefix = ""
+
+    # Fields being searched
+    search_fields: list[str] = []
+
+    if not isinstance(query, list):
+        query = [query]
+
+    if "bash" in shell:
+        if len(query) >= 2 and query[-1] == ":":
+            # Searching specific fields
+            search_fields = [query[-2]]
+        elif query and incomplete == ":":
+            # Also searching specific fields (no value char is present yet)
+            search_fields = [query[-1]]
+            term = ""
+
+    if re.match("^([a-zA-Z]+)[:]($|[^:].*)$", incomplete):
+        # The `incomplete` argument is not split by ':', so we split
+        # ourselves
+        prefix, term = incomplete.split(":", 1)
+        search_fields = [prefix]
+        prefix += ":"
+
+    if term.startswith('"'):
+        term = term[1:]
+        quote_each_term = True
+
+    if not search_fields:
+        search_fields = [
+            "name",
+            "fullname",
+            "demangled",
+        ]
+
+    try:
+        index = SymbolIndex.open(index_path, readonly=True)
+    except Exception:
+        return []
+
+    with index:
+        for field in search_fields:
+            field_obj = SymbolIndex.SCHEMA.get(field)
+            if not field_obj:
+                continue
+            if isinstance(field_obj, _OptionalField):
+                field_obj = field_obj.field
+
+            try:
+                results.extend([i for i in index.iter_prefix(field, term)])
+            except Exception:
+                # Ignore errors in query, e.g. invalid field name
+                pass
+
+            # Complete paths
+            if isinstance(field_obj, PathField) and not term.startswith("/"):
+                results.extend(_complete_paths(index, field, term))
+
+    for i, item in enumerate(results):
+        if quote_each_term or _should_quote_shell_completion(item):
+            results[i] = json.dumps(item)
+
+    for keyword in ["AND", "OR", "NOT"]:
+        if keyword.startswith(incomplete):
+            results.append(keyword)
+
+    # Complete search fields
+    results += [
+        f.name + ":"
+        for f in SymbolIndex.SCHEMA.fields
+        if f.name.startswith(incomplete)
+    ]
+
+    results = [prefix + i for i in results]
+
+    if "zsh" in shell:
+        # Zsh completion in Click does not always work properly if the
+        # completions don't share a common prefix with what was typed
+        # by the user
+        results = [i for i in results if i.startswith(incomplete)]
+
+    return [CompletionItem(i) for i in results] + additional_completions
+
+
 @cli.command()
 @_common_options(index_must_exist=True)
 @click.argument(
     "query",
     nargs=-1,
+    shell_complete=_complete_query,
 )
 @click.option(
     "-n",
@@ -387,6 +543,7 @@ def search(_directory, index_path, query, num, format):
 @click.argument(
     "query",
     nargs=-1,
+    shell_complete=_complete_query,
 )
 @click.option(
     "-n",
@@ -513,10 +670,12 @@ if have_graphs:
     @click.argument(
         "start_query",
         nargs=1,
+        shell_complete=_complete_query,
     )
     @click.argument(
         "goal_query",
         nargs=1,
+        shell_complete=_complete_query,
     )
     @click.option(
         "-n",

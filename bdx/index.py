@@ -1164,6 +1164,21 @@ class SearchResult:
         }
 
 
+def _parse_query(index: SymbolIndex, query: str) -> xapian.Query:
+    try:
+        return index.parse_query(query)
+    except Exception as e:
+        msgs = [f"Invalid query: {str(e)}"]
+
+        quoted = json.dumps(query)
+        parsed_quoted = index.parse_query(quoted + "*")
+        if index.search(parsed_quoted, limit=1).count > 0:
+            msgs.append("Did you forget to quote the demangled symbol name?")
+
+        error("\n".join(msgs))
+        exit(1)
+
+
 def search_index(
     index_path: Path,
     query: str,
@@ -1199,7 +1214,7 @@ def search_index(
         query = "*:*"
 
     with SymbolIndex.open(index_path, readonly=True) as index:
-        parsed_query = index.parse_query(query)
+        parsed_query = _parse_query(index, query)
         debug("Search query: {}", parsed_query)
 
         results = index.search(parsed_query, limit=limit)
