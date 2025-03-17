@@ -1,11 +1,51 @@
+import json
 import re
 from enum import Enum
-from typing import Optional
+from json.scanner import make_scanner as make_json_scanner
+from typing import Callable, Optional
 
 import xapian
 
-from bdx import debug
+from bdx import debug, trace
 from bdx.index import Schema
+
+
+def _make_regex_matcher(
+    pattern: str,
+) -> Callable[[str], Optional[tuple[str, int]]]:
+    def matcher(s):
+        match = re.match(pattern, s)
+        if match:
+            _, idx = match.span()
+
+            if match.groups():
+                value = match.group(1)
+            else:
+                value = ""
+
+            return value, idx
+
+        return None
+
+    return matcher
+
+
+def _make_string_matcher() -> Callable[[str], Optional[tuple[str, int]]]:
+    decoder = json.decoder.JSONDecoder()
+    scanner = make_json_scanner(decoder)  # type: ignore
+
+    def matcher(s):
+        if not s or not s.startswith('"'):
+            return None
+
+        try:
+            value, length = scanner(s, 0)
+            return value, length
+
+        except Exception:
+            pass
+
+    return matcher
 
 
 class Token(Enum):
@@ -25,20 +65,22 @@ class Token(Enum):
     Wildcard = "WILDCARD"
 
     @staticmethod
-    def patterns() -> list[tuple["Token", re.Pattern]]:
-        """Return a list of patterns for each token, in proper test order."""
+    def matchers() -> (
+        list[tuple["Token", Callable[[str], Optional[tuple[str, int]]]]]
+    ):
+        """Return a list of matchers for each token, in proper test order."""
         return [
-            (Token.Whitespace, re.compile(r"\s+")),
-            (Token.And, re.compile(r"AND\b")),
-            (Token.Or, re.compile(r"OR\b")),
-            (Token.Not, re.compile(r"NOT\b|!")),
-            (Token.Lparen, re.compile(r"[(]")),
-            (Token.Rparen, re.compile(r"[)]")),
-            (Token.String, re.compile(r'"([^"]+)"')),
-            (Token.Field, re.compile(r"([a-zA-Z_]+):")),
-            (Token.MatchAll, re.compile(r"[*]:[*]")),
-            (Token.Wildcard, re.compile(r"[*]")),
-            (Token.Term, re.compile(r"([^\s()*]+)")),
+            (Token.Whitespace, _make_regex_matcher(r"\s+")),
+            (Token.And, _make_regex_matcher(r"AND\b")),
+            (Token.Or, _make_regex_matcher(r"OR\b")),
+            (Token.Not, _make_regex_matcher(r"NOT\b|!")),
+            (Token.Lparen, _make_regex_matcher(r"[(]")),
+            (Token.Rparen, _make_regex_matcher(r"[)]")),
+            (Token.String, _make_string_matcher()),
+            (Token.Field, _make_regex_matcher(r"([a-zA-Z_]+):")),
+            (Token.MatchAll, _make_regex_matcher(r"[*]:[*]")),
+            (Token.Wildcard, _make_regex_matcher(r"[*]")),
+            (Token.Term, _make_regex_matcher(r"([^\s()*]+)")),
         ]
 
 
@@ -109,6 +151,8 @@ class QueryParser:
 
     def parse_query(self, query: str) -> xapian.Query:
         """Parse the given query."""
+        trace("Parsing query: {!r}", query)
+
         if query.strip() == "*:*":
             return _MATCH_ALL
 
@@ -134,13 +178,22 @@ class QueryParser:
             query = self._query[pos:]
             if not query:
                 self._token = Token.EOF
+                trace("Got EOF at pos {}", pos)
                 return
 
-            for token, pat in Token.patterns():
-                match = re.match(pat, query)
+            for token, matcher in Token.matchers():
+                match = matcher(query)
                 if match:
-                    _, idx = match.span()
+                    value, idx = match
                     pos += idx
+
+                    trace(
+                        "Scanned {} at pos {}: '{}'",
+                        token,
+                        self._pos,
+                        value,
+                    )
+
                     self._pos = pos
 
                     if token == Token.Whitespace:
@@ -148,10 +201,7 @@ class QueryParser:
                         return
 
                     self._token = token
-                    if match.groups():
-                        self._value = match.group(1)
-                    else:
-                        self._value = ""
+                    self._value = value
                     return
 
             debug(f"Warning: unknown token at {self._pos}")

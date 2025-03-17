@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 from pathlib import Path
 
@@ -140,6 +141,32 @@ def test_string(query_parser):
     assert query_to_tuple(query_parser.parse_query(' "foo baz"')) == (
         LEAF_TERM,
         "XNAMEfoo baz",
+    )
+
+
+def test_string_escaped(query_parser):
+    assert query_to_tuple(query_parser.parse_query(' "foo \\"baz\\""')) == (
+        LEAF_TERM,
+        'XNAMEfoo "baz"',
+    )
+
+    assert query_to_tuple(query_parser.parse_query(json.dumps("test"))) == (
+        LEAF_TERM,
+        "XNAMEtest",
+    )
+
+    assert query_to_tuple(
+        query_parser.parse_query(json.dumps(json.dumps("test")))
+    ) == (
+        LEAF_TERM,
+        f'XNAME{json.dumps("test")}',
+    )
+
+    assert query_to_tuple(
+        query_parser.parse_query(json.dumps(json.dumps(json.dumps("test"))))
+    ) == (
+        LEAF_TERM,
+        f'XNAME{json.dumps(json.dumps("test"))}',
     )
 
 
