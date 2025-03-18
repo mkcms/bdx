@@ -119,10 +119,6 @@ class DatabaseField:
 class TextField(DatabaseField):
     """A database field that indexes text."""
 
-    def preprocess_value(self, value: Any) -> bytes:
-        """Preprocess the value before indexing it."""
-        return super().preprocess_value(value).lower()
-
     def index(self, document: xapian.Document, value: Any):
         """Index ``value`` in the ``document``."""
         termgen = xapian.TermGenerator()
@@ -301,6 +297,7 @@ class SymbolNameField(TextField):
     def index(self, document, value: Any):
         """Index ``value`` in the ``document``."""
         DatabaseField.index(self, document, value)
+        DatabaseField.index(self, document, value.lower())
 
         if isinstance(value, bytes):
             value = value.decode()
@@ -309,6 +306,28 @@ class SymbolNameField(TextField):
         value = " ".join(tokens)
 
         super().index(document, value)
+        super().index(document, value.lower())
+
+    def make_query(self, value: str, wildcard: bool = False) -> xapian.Query:
+        """Make a query for the given value.
+
+        Args:
+            value: The string to search for in the query.
+            wildcard: If true, make a wildcard query.
+
+        """
+        if value.islower():
+            return super().make_query(value, wildcard)
+
+        return xapian.Query(
+            xapian.Query.OP_OR,
+            super().make_query(value, wildcard),
+            xapian.Query(
+                xapian.Query.OP_SCALE_WEIGHT,
+                super().make_query(value.lower(), wildcard),
+                0.6667,
+            ),
+        )
 
 
 @dataclass(frozen=True)
