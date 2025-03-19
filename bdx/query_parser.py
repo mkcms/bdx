@@ -41,9 +41,9 @@ def _make_string_matcher() -> Callable[[str], Optional[tuple[str, int]]]:
         try:
             value, length = scanner(s, 0)
             return value, length
-
-        except Exception:
-            pass
+        except Exception as e:
+            msg = "Unterminated string"
+            raise QueryParser.Error(msg) from e
 
     return matcher
 

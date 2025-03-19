@@ -144,6 +144,11 @@ def test_string(query_parser):
     )
 
 
+def test_unterminated_string(query_parser):
+    with pytest.raises(QueryParser.Error, match="[Uu]nterminated"):
+        query_parser.parse_query('test "string')
+
+
 def test_string_escaped(query_parser):
     assert query_to_tuple(query_parser.parse_query(' "foo \\"baz\\""')) == (
         LEAF_TERM,

@@ -530,7 +530,7 @@ def search(_directory, index_path, query, num, format):
                 click.echo(fmt.format(**data))
             except (KeyError, ValueError, TypeError) as e:
                 error(
-                    "Invalid format: {} in '{}'\nAvailable keys: {}",
+                    "Invalid format: {!r} in {!r}\nAvailable keys: {}",
                     str(e),
                     fmt,
                     list(data.keys()),
@@ -613,7 +613,7 @@ def disass(
             cmd = disassembler.format(**data)
         except (KeyError, ValueError, TypeError) as e:
             error(
-                "Invalid format: {} in '{}'\nAvailable keys: {}",
+                "Invalid format: {!r} in {!r}\nAvailable keys: {}",
                 str(e),
                 disassembler,
                 list(data.keys()),
