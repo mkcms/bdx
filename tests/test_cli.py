@@ -145,7 +145,7 @@ def test_cli_search_json_output(fixture_path, index_path):
         "demangled": "cxx_function(std::vector<int, std::allocator<int> >)",
         "section": ".text",
         "address": 0,
-        "size": 24,
+        "size": 28,
         "type": "FUNC",
         "relocations": ["bar", "foo"],
     }
@@ -178,7 +178,7 @@ def test_cli_search_sexp_output(fixture_path, index_path):
         ' :demangled "cxx_function(std::vector<int, std::allocator<int> >)"'
         ' :section ".text"'
         " :address 0"
-        " :size 24"
+        " :size 28"
         ' :type "FUNC"'
         ' :relocations ("bar" "foo")'
         " :mtime XXX"
@@ -286,6 +286,102 @@ def test_cli_prefix_completions(fixture_path, index_path):
     assert completionsresult.exit_code == 0
     for completion in completionsresult.output.splitlines():
         assert completion.startswith("_Z")
+
+
+def test_cli_complete_query(chdir, fixture_path, index_path):
+    runner = CliRunner()
+    result = index_directory(runner, fixture_path, index_path)
+    assert result.exit_code == 0
+
+    completionsresult = runner.invoke(
+        cli, ["complete-query", "--index-path", index_path, "path:"]
+    )
+    assert completionsresult.exit_code == 0
+    assert set(
+        [
+            "path:bar.cpp.o",
+            "path:foo.c.o",
+            "path:toplev.c.o",
+            "path:" + str(fixture_path / "subdir" / "bar.cpp.o"),
+            "path:" + str(fixture_path / "subdir" / "foo.c.o"),
+            "path:" + str(fixture_path / "toplev.c.o"),
+            "path:tests/",
+            "path:tests/*",
+        ]
+    ).issubset(set(completionsresult.output.splitlines()))
+
+    with chdir(fixture_path):
+        completionsresult = runner.invoke(
+            cli, ["complete-query", "--index-path", index_path, "path:./"]
+        )
+        assert completionsresult.exit_code == 0
+        assert set(completionsresult.output.splitlines()) == set(
+            [
+                "path:./subdir/",
+                "path:./subdir/*",
+                "path:./toplev.c",
+                "path:./toplev.c.o",
+            ]
+        )
+
+    with chdir(fixture_path / "subdir"):
+        completionsresult = runner.invoke(
+            cli, ["complete-query", "--index-path", index_path, "path:./../"]
+        )
+        assert completionsresult.exit_code == 0
+        assert set(completionsresult.output.splitlines()) == set(
+            [
+                "path:./../subdir/",
+                "path:./../subdir/*",
+                "path:./../toplev.c",
+                "path:./../toplev.c.o",
+            ]
+        )
+
+    completionsresult = runner.invoke(
+        cli, ["complete-query", "--index-path", index_path, "name:"]
+    )
+    assert "name:uses_c_function" in completionsresult.output
+    assert "name:bar" in completionsresult.output
+
+    completionsresult = runner.invoke(
+        cli, ["complete-query", "--index-path", index_path, "path:/* AN"]
+    )
+    assert "path:/* AND " in completionsresult.output
+
+    completionsresult = runner.invoke(
+        cli, ["complete-query", "--index-path", index_path, "path:/* "]
+    )
+    assert "path:/* AND" in completionsresult.output
+    assert "path:/* OR" in completionsresult.output
+    assert "path:/* demangled:" in completionsresult.output
+
+    completionsresult = runner.invoke(
+        cli, ["complete-query", "--index-path", index_path, "demangl"]
+    )
+    assert set(completionsresult.output.splitlines()) == set(["demangled:"])
+
+    completionsresult = runner.invoke(
+        cli, ["complete-query", "--index-path", index_path, "demangled: (O"]
+    )
+    assert set(completionsresult.output.splitlines()) == set(
+        ["demangled: (OR "]
+    )
+
+    completionsresult = runner.invoke(
+        cli,
+        ["complete-query", "--index-path", index_path, 'demangled:"CppCam'],
+    )
+    assert set(completionsresult.output.splitlines()) == set(
+        ['demangled:"CppCamelCaseSymbol(char const*)"']
+    )
+
+    completionsresult = runner.invoke(
+        cli, ["complete-query", "--index-path", index_path, "demangled:CppCam"]
+    )
+    assert set(completionsresult.output.splitlines()) == set(
+        ['demangled:"CppCamelCaseSymbol(char const*)"']
+    )
 
 
 def test_cli_graph(fixture_path, index_path):

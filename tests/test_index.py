@@ -25,7 +25,7 @@ def test_indexing(fixture_path, tmp_path):
 
     with SymbolIndex.open(index_path, readonly=True) as index:
         symbols = index.search("*:*")
-        assert symbols.count == 18
+        assert symbols.count == 19
         by_name = {x.name: x for x in symbols}
 
         top_level_symbol = by_name["top_level_symbol"]
@@ -41,6 +41,7 @@ def test_indexing(fixture_path, tmp_path):
         foo_ = by_name["foo_"]
         foo__ = by_name["foo__"]
         uses_foo = by_name["uses_foo"]
+        global_integer = by_name["_ZL14global_integer"]
 
         assert top_level_symbol.path == fixture_path / "toplev.c.o"
         assert top_level_symbol.name == "top_level_symbol"
@@ -143,6 +144,11 @@ def test_indexing(fixture_path, tmp_path):
         assert uses_foo.section == ".text"
         assert uses_foo.type == SymbolType.FUNC
         assert uses_foo.size == 13
+
+        assert global_integer.path == fixture_path / "subdir" / "bar.cpp.o"
+        assert global_integer.section == ".bss"
+        assert global_integer.type == SymbolType.OBJECT
+        assert global_integer.size == 4
 
 
 def test_reindexing(fixture_path, tmp_path):

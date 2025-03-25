@@ -634,3 +634,196 @@ def test_missing_closing_paren(query_parser):
         QueryParser.Error, match=r'closing "[)]".*at position 1.*at position 5'
     ):
         assert query_parser.parse_query(" (foo")
+
+
+def test_complete_keywords_and_known_fields(empty_index, query_parser):
+    assert set(query_parser.complete_query(empty_index, "")) == set(
+        [
+            "AND",
+            "OR",
+            "NOT",
+            *[field + ":" for field in empty_index.schema],
+        ]
+    )
+
+    assert set(query_parser.complete_query(empty_index, "A")) == set(
+        [
+            "AND",
+        ]
+    )
+
+    assert set(query_parser.complete_query(empty_index, "AN")) == set(
+        [
+            "AND",
+        ]
+    )
+
+    assert set(query_parser.complete_query(empty_index, "ANN")) == set([])
+
+    assert set(
+        query_parser.complete_query(empty_index, "prefix string")
+    ) == set([])
+
+    assert set(
+        query_parser.complete_query(empty_index, "prefix string ")
+    ) == set(
+        [
+            "prefix string AND ",
+            "prefix string OR ",
+            "prefix string NOT ",
+            *[f"prefix string {field}:" for field in empty_index.schema],
+        ]
+    )
+
+    assert set(
+        query_parser.complete_query(empty_index, "prefix string A")
+    ) == set(["prefix string AND "])
+
+    assert set(
+        query_parser.complete_query(empty_index, "prefix string O")
+    ) == set(["prefix string OR "])
+
+    assert set(
+        query_parser.complete_query(
+            empty_index, '"__tsan::InitializeInterceptors()" AN'
+        )
+    ) == set(['"__tsan::InitializeInterceptors()" AND '])
+
+
+def test_complete_name(readonly_index, query_parser):
+    assert set(query_parser.complete_query(readonly_index, "name:Cam")) == set(
+        [
+            "name:CamelCaseSymbol",
+        ]
+    )
+
+
+def test_complete_all_terms(readonly_index):
+    query_parser = readonly_index.make_query_parser()
+
+    completions = set(query_parser.complete_query(readonly_index, "name:"))
+    terms = set(readonly_index.iter_prefix("name", ""))
+    assert completions == set([f"name:{term}" for term in terms])
+
+    completions = set(
+        query_parser.complete_query(readonly_index, 'demangled:"')
+    )
+    terms = set(readonly_index.iter_prefix("demangled", ""))
+    assert completions == set([f'demangled:"{term}"' for term in terms])
+
+    completions = set(query_parser.complete_query(readonly_index, ""))
+    terms = set(readonly_index.iter_prefix("name", ""))
+    terms.update(set(readonly_index.iter_prefix("fullname", "")))
+    assert completions.intersection(terms)
+
+
+def test_complete_all_quoted_terms(readonly_index):
+    query_parser = readonly_index.make_query_parser()
+    query_parser.default_fields.append("demangled")
+
+    completions = set(query_parser.complete_query(readonly_index, 'prefix "'))
+    terms = set(readonly_index.iter_prefix("name", ""))
+    terms.update(set(readonly_index.iter_prefix("demangled", "")))
+    terms.update(set(readonly_index.iter_prefix("fullname", "")))
+    assert completions == set(f'prefix "{term}"' for term in terms)
+
+
+def test_complete_all_quoted_terms_with_prefix(readonly_index):
+    query_parser = readonly_index.make_query_parser()
+
+    completions = set(query_parser.complete_query(readonly_index, 'prefix "_'))
+    terms = set(readonly_index.iter_prefix("name", "_"))
+    terms.update(set(readonly_index.iter_prefix("demangled", "_")))
+    terms.update(set(readonly_index.iter_prefix("fullname", "_")))
+    assert completions == set(f'prefix "{term}"' for term in terms)
+
+
+def test_complete_demangled_name(readonly_index):
+    query_parser = readonly_index.make_query_parser()
+
+    assert set(
+        query_parser.complete_query(readonly_index, 'demangled:"Cpp')
+    ) == set(
+        [
+            'demangled:"CppCamelCaseSymbol(char const*)"',
+        ]
+    )
+
+    assert set(
+        query_parser.complete_query(readonly_index, "demangled:Cpp")
+    ) == set(
+        [
+            'demangled:"CppCamelCaseSymbol(char const*)"',
+        ]
+    )
+
+    assert set(
+        query_parser.complete_query(readonly_index, "demangled:global_")
+    ) == set(
+        [
+            "demangled:global_integer",
+        ]
+    )
+
+    assert set(
+        query_parser.complete_query(readonly_index, 'demangled:"global_')
+    ) == set(
+        [
+            'demangled:"global_integer"',
+        ]
+    )
+
+    assert set(
+        query_parser.complete_query(
+            readonly_index, 'demangled:"global_integer" AND demangled:"global'
+        )
+    ) == set(
+        [
+            'demangled:"global_integer" AND demangled:"global"',
+            'demangled:"global_integer" AND demangled:"global_integer"',
+        ]
+    )
+
+
+def test_complete_path(chdir, fixture_path, readonly_index):
+    query_parser = readonly_index.make_query_parser()
+
+    with chdir(fixture_path):
+        assert set(
+            query_parser.complete_query(readonly_index, "path:./s")
+        ) == set(
+            [
+                "path:./subdir/",
+                "path:./subdir/*",
+            ]
+        )
+
+        assert set(
+            query_parser.complete_query(readonly_index, "path:./..//fixture/")
+        ) == set(
+            [
+                "path:./../fixture/subdir/",
+                "path:./../fixture/subdir/*",
+                "path:./../fixture/toplev.c",
+                "path:./../fixture/toplev.c.o",
+            ]
+        )
+
+        assert set(
+            query_parser.complete_query(readonly_index, "path:su")
+        ) == set(
+            [
+                "path:subdir/",
+                "path:subdir/*",
+            ]
+        )
+        assert set(
+            query_parser.complete_query(readonly_index, "path:subdir/")
+        ) == set(
+            [
+                "path:subdir/bar.cpp",
+                "path:subdir/bar.cpp.o",
+                "path:subdir/foo.c",
+                "path:subdir/foo.c.o",
+            ]
+        )

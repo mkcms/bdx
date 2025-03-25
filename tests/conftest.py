@@ -33,6 +33,20 @@ def chdir():
 
 
 @pytest.fixture(scope="session")
+def empty_index(tmp_path_factory):
+    index_path = tmp_path_factory.mktemp(f"index{uuid4()}")
+    empty_path = tmp_path_factory.mktemp(f"dir")
+    index_binary_directory(
+        empty_path,
+        index_path,
+        IndexingOptions(),
+    )
+
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        yield index
+
+
+@pytest.fixture(scope="session")
 def readonly_index(tmp_path_factory):
     index_path = tmp_path_factory.mktemp(f"index{uuid4()}")
     index_binary_directory(

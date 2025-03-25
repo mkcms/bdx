@@ -774,16 +774,19 @@ class SymbolIndex:
         except xapian.DatabaseModifiedError as e:
             raise SymbolIndex.ModifiedError from e
 
-    def parse_query(self, query: str) -> xapian.Query:
-        """Parse the given query string, returning a Query object."""
+    def make_query_parser(self):
+        """Return a query parser object for this index."""
         from bdx.query_parser import QueryParser
 
-        query_parser = QueryParser(
+        return QueryParser(
             SymbolIndex.SCHEMA,
             default_fields=["name", "demangled"],
             auto_wildcard=True,
         )
-        return query_parser.parse_query(query)
+
+    def parse_query(self, query: str) -> xapian.Query:
+        """Parse the given query string, returning a Query object."""
+        return self.make_query_parser().parse_query(query)
 
     def _live_db(self) -> xapian.Database | xapian.WritableDatabase:
         if self._db is None:

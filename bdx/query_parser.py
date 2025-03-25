@@ -2,12 +2,13 @@ import json
 import re
 from enum import Enum
 from json.scanner import make_scanner as make_json_scanner
-from typing import Callable, Optional
+from pathlib import Path
+from typing import Callable, Iterator, Optional
 
 import xapian
 
 from bdx import debug, trace
-from bdx.index import Schema
+from bdx.index import PathField, Schema, SymbolIndex, _OptionalField
 
 
 def _make_regex_matcher(
@@ -172,7 +173,148 @@ class QueryParser:
             return xapian.Query()
         return self._parsed
 
-    def _next_token(self):
+    def _complete_paths(
+        self, index: SymbolIndex, field: str, term: str
+    ) -> list[str]:
+        """Generate a list of completions for ``term`` query string."""
+        if term.startswith("/"):
+            # In this case, the query will be completed by simply
+            # searching for the prefix in the database.
+            return []
+
+        prefix = ""
+        if term.startswith("./"):
+            prefix = "./"
+
+        results = []
+        for p in Path().glob(f"{term}*"):
+            resolved = Path(p).absolute().resolve()
+
+            try:
+                next(index.iter_prefix(field, str(resolved)))
+            except StopIteration:
+                # If the prefix does not exist, don't return this path
+                continue
+
+            if p.is_dir():
+                results.append(str(p) + "/")
+                results.append(str(p) + "/*")
+            else:
+                results.append(str(p))
+
+        return [prefix + i for i in results]
+
+    def complete_query(self, index: SymbolIndex, query: str) -> Iterator[str]:
+        """Complete the given query in index."""
+        self._query = query
+        self._token = None
+        self._pos = 0
+        self._parsed = None
+
+        # Entire string before current token
+        prefix = ""
+
+        curtok, curvalue = None, ""
+        prevtok, prevvalue = None, ""
+
+        # List of fields to complete
+        fields: list[str] = []
+
+        def should_quote_completion(string: str):
+            match_length = 0
+            for _, matcher in Token.matchers():
+                match = matcher(string)
+                if match:
+                    match_length = match[1]
+                    break
+
+            if match_length == len(string):
+                return False
+
+            if match_length == len(string) - 1:
+                return string[-1] != "*"
+
+            return True
+
+        def make_completion(s: str):
+            if prefix and prefix[-1] == '"':
+                # Finish unterminated strings
+                s += '"'
+            elif should_quote_completion(s):
+                s = json.dumps(s)
+
+            return prefix + s
+
+        while True:
+            pos = self._pos
+            try:
+                self._next_token(ignore_whitespace=False)
+            except QueryParser.Error:
+                if self._query[pos] == '"':
+                    self._token = Token.String
+                    self._value = self._query[pos + 1 :]
+                    self._pos = len(self._query)
+                    pos += 1
+                else:
+                    raise
+
+            if self._token == Token.EOF:
+                break
+
+            prevtok, prevvalue = curtok, curvalue
+            curtok, curvalue = self._token, self._value
+            prefix = self._query[:pos]
+
+        if curtok == Token.Field:
+            # If the last token is a field, then the current term is
+            # empty: complete all known values for this field
+            prevtok, prevvalue = Token.Field, curvalue
+            curtok, curvalue = Token.Term, ""
+            prefix = self._query
+
+        if prevtok == Token.Field:
+            fields = [prevvalue]
+        else:
+            fields = self.default_fields
+
+        if (
+            curtok in (Token.Term, Token.Whitespace, None)
+            and prevtok != Token.Field
+        ):
+            maybe_prefix_space = " " if curtok == Token.Whitespace else ""
+            maybe_suffix_space = " " if prefix else ""
+            fmt = "{}{{}}{}".format(maybe_prefix_space, maybe_suffix_space)
+
+            # Complete known keywords
+            if prevtok not in [Token.And, Token.Or, Token.Not]:
+                for keyword in ["AND", "OR", "NOT"]:
+                    if keyword.startswith(curvalue or ""):
+                        yield prefix + fmt.format(keyword)
+
+            # Complete field names
+            for field in index.schema.fields:
+                completion = maybe_prefix_space + field.name + ":"
+                if completion.startswith(curvalue or ""):
+                    yield prefix + completion
+
+        if curtok in (Token.Term, Token.String, None):
+            for search_field in fields:
+                if search_field not in self.schema:
+                    continue
+
+                for res in index.iter_prefix(search_field, curvalue or ""):
+                    yield make_completion(res)
+
+                field_obj = self.schema[search_field]
+                if isinstance(field_obj, _OptionalField):
+                    field_obj = field_obj.field
+                if isinstance(field_obj, PathField):
+                    for path in self._complete_paths(
+                        index, search_field, curvalue
+                    ):
+                        yield make_completion(path)
+
+    def _next_token(self, ignore_whitespace=True):
         while True:
             pos = self._pos
             query = self._query[pos:]
@@ -196,7 +338,7 @@ class QueryParser:
 
                     self._pos = pos
 
-                    if token == Token.Whitespace:
+                    if ignore_whitespace and token == Token.Whitespace:
                         self._next_token()
                         return
 

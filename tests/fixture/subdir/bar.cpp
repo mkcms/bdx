@@ -2,6 +2,7 @@
 
 extern int foo;
 int bar;
+static int global_integer;
 
 int cxx_function(std::vector<int>) { return foo + bar; }
 
