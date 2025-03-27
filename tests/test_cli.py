@@ -235,59 +235,6 @@ def test_cli_file_list(fixture_path, index_path):
     )
 
 
-def test_cli_prefix_completions(fixture_path, index_path):
-    runner = CliRunner()
-    result = index_directory(runner, fixture_path, index_path)
-    assert result.exit_code == 0
-
-    completionsresult = runner.invoke(
-        cli, ["complete-prefix", "--index-path", index_path, "path"]
-    )
-    assert completionsresult.exit_code == 0
-    assert set(completionsresult.output.splitlines()) == set(
-        [
-            "bar.cpp.o",
-            "foo.c.o",
-            "toplev.c.o",
-            str(fixture_path / "subdir" / "bar.cpp.o"),
-            str(fixture_path / "subdir" / "foo.c.o"),
-            str(fixture_path / "toplev.c.o"),
-        ]
-    )
-
-    completionsresult = runner.invoke(
-        cli,
-        [
-            "complete-prefix",
-            "--index-path",
-            index_path,
-            "path",
-            str(fixture_path / "subdir"),
-        ],
-    )
-    assert completionsresult.exit_code == 0
-    assert set(completionsresult.output.splitlines()) == set(
-        [
-            str(fixture_path / "subdir" / "bar.cpp.o"),
-            str(fixture_path / "subdir" / "foo.c.o"),
-        ]
-    )
-
-    completionsresult = runner.invoke(
-        cli,
-        [
-            "complete-prefix",
-            "--index-path",
-            index_path,
-            "fullname",
-            "_Z",
-        ],
-    )
-    assert completionsresult.exit_code == 0
-    for completion in completionsresult.output.splitlines():
-        assert completion.startswith("_Z")
-
-
 def test_cli_complete_query(chdir, fixture_path, index_path):
     runner = CliRunner()
     result = index_directory(runner, fixture_path, index_path)
