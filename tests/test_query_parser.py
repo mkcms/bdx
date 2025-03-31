@@ -827,3 +827,13 @@ def test_complete_path(chdir, fixture_path, readonly_index):
                 "path:subdir/foo.c.o",
             ]
         )
+
+
+def test_complete_query_as_term(readonly_index):
+    query_parser = readonly_index.make_query_parser()
+
+    assert set(
+        query_parser.complete_query(
+            readonly_index, "cxx_function(std::vector<int, std::"
+        )
+    ) == set(['"cxx_function(std::vector<int, std::allocator<int> >)"'])

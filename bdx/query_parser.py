@@ -236,14 +236,14 @@ class QueryParser:
 
             return True
 
-        def make_completion(s: str):
+        def make_completion(s: str, add_prefix=True):
             if prefix and prefix[-1] == '"':
                 # Finish unterminated strings
                 s += '"'
             elif should_quote_completion(s):
                 s = json.dumps(s)
 
-            return prefix + s
+            return (prefix if add_prefix else "") + s
 
         while True:
             pos = self._pos
@@ -313,6 +313,10 @@ class QueryParser:
                         index, search_field, curvalue
                     ):
                         yield make_completion(path)
+
+        for search_field in self.default_fields:
+            for res in index.iter_prefix(search_field, query):
+                yield make_completion(res, add_prefix=False)
 
     def _next_token(self, ignore_whitespace=True):
         while True:
