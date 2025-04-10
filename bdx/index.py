@@ -249,18 +249,6 @@ class PathField(DatabaseField):
         return query
 
 
-class RelocationsField(DatabaseField):
-    """Represents a field for the list of relocations in a given symbol."""
-
-    def index(self, document: xapian.Document, value: Any):
-        """Index ``value`` in the ``document``."""
-        if isinstance(value, list):
-            for v in value:
-                self.index(document, v)
-        else:
-            return super().index(document, value)
-
-
 class SymbolNameField(TextField):
     """DatabaseField that indexes symbol names specially."""
 
@@ -328,6 +316,18 @@ class SymbolNameField(TextField):
                 0.6667,
             ),
         )
+
+
+class RelocationsField(SymbolNameField):
+    """Represents a field for the list of relocations in a given symbol."""
+
+    def index(self, document: xapian.Document, value: Any):
+        """Index ``value`` in the ``document``."""
+        if isinstance(value, list):
+            for v in value:
+                self.index(document, v)
+        else:
+            return super().index(document, value)
 
 
 @dataclass(frozen=True)

@@ -33,6 +33,12 @@ def _get_neighbors(index: SymbolIndex, symbol: Symbol) -> set[Symbol]:
     except KeyError:
         query = index.schema["relocations"].make_query(symbol.name)
         res = set(index.search(query))
+
+        # If `symbol' is "func" we could have matched symbols that
+        # have a relocation to "some_func".  Filter out the results to
+        # make sure we match the symbol exactly.
+        res = set([x for x in res if symbol.name in x.relocations])
+
         cache[symbol] = res
         return res
 
