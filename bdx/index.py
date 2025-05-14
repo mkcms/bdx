@@ -624,14 +624,19 @@ class SymbolIndex:
                 break
 
     @staticmethod
-    def default_path(directory: Path | str) -> Path:
-        """Return a default index path for binary ``directory``."""
-        parts = Path(directory).absolute().parts[1:]
+    def default_cache_dir() -> Path:
+        """Return a default directory where indices will be contained."""
         global_cache_dir = Path(
             os.getenv("XDG_CACHE_HOME", "~/.cache")
         ).expanduser()
+        return global_cache_dir / "bdx" / "index"
+
+    @staticmethod
+    def default_path(directory: Path | str) -> Path:
+        """Return a default index path for binary ``directory``."""
+        parts = Path(directory).absolute().parts[1:]
         basename = "!".join(parts)
-        return global_cache_dir / "bdx" / "index" / basename
+        return SymbolIndex.default_cache_dir() / basename
 
     @property
     def path(self) -> Path:

@@ -71,6 +71,29 @@ def guess_directory_from_index_path(
     return None
 
 
+def guess_index_path_for_directory(directory: str | Path) -> Path:
+    """Return the path to the index path for given binary directory."""
+    directory = Path(directory).absolute()
+    cache_dir = SymbolIndex.default_cache_dir()
+    if not cache_dir.exists():
+        return SymbolIndex.default_path(directory)
+
+    for index_path in cache_dir.iterdir():
+        try:
+            with SymbolIndex.open(index_path, readonly=True) as index:
+                binary_dir = index.binary_dir()
+                if binary_dir is None:
+                    continue
+                if binary_dir == directory:
+                    return index_path
+                if binary_dir in directory.parents:
+                    return index_path
+        except SymbolIndex.Error:
+            pass
+
+    return SymbolIndex.default_path(directory)
+
+
 def default_directory(ctx: click.Context) -> Path:
     """Return the default binary directory using given CLI context."""
     cwd = Path().absolute()
@@ -143,7 +166,10 @@ def _common_options(index_must_exist=False):
                 directory = default_directory(ctx)
                 did_guess_directory = True
             if not index_path:
-                index_path = SymbolIndex.default_path(directory)
+                if not did_guess_directory:
+                    index_path = SymbolIndex.default_path(directory)
+                else:
+                    index_path = guess_index_path_for_directory(directory)
 
             index_path = Path(index_path)
             directory = Path(directory)
