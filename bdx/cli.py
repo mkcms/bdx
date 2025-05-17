@@ -142,6 +142,14 @@ def _common_options(index_must_exist=False):
             help="Path to the index.  By default, it is located in ~/.cache.",
         )
         @click.option(
+            "--check-index-exists",
+            help=(
+                "Check if index exists and exit with 0"
+                " if it does, or with 1 otherwise."
+            ),
+            is_flag=True,
+        )
+        @click.option(
             "-v",
             "--verbose",
             count=True,
@@ -157,6 +165,7 @@ def _common_options(index_must_exist=False):
             *args,
             directory: str | Path,
             index_path: str | Path,
+            check_index_exists: bool,
             verbose: int,
             **kwargs,
         ):
@@ -190,6 +199,14 @@ def _common_options(index_must_exist=False):
                 except SymbolIndex.Error as e:
                     msg = f"Invalid index: {index_path}"
                     raise click.BadParameter(msg) from e
+
+                if check_index_exists:
+                    sys.exit(0)
+            elif check_index_exists:
+                click.echo(
+                    f"Index for {directory} does not exist: {index_path}"
+                )
+                sys.exit(1)
             elif index_must_exist:
                 msg = f"Directory is not indexed: {directory}"
                 raise click.UsageError(msg)
@@ -590,7 +607,7 @@ def complete_query(_directory, index_path, query):
     with SymbolIndex.open(index_path, readonly=True) as index:
         parser = index.make_query_parser()
         for completion in parser.complete_query(index, query):
-            print(completion)
+            click.echo(completion)
 
 
 if have_graphs:
