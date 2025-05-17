@@ -337,7 +337,10 @@ def test_cli_graph(fixture_path, index_path):
     except ImportError:
         pytest.skip(reason="Graphs not available, package not installed")
 
-    runner = CliRunner(mix_stderr=False)
+    try:
+        runner = CliRunner(mix_stderr=False)  # type: ignore
+    except:
+        runner = CliRunner()
     result = index_directory(runner, fixture_path, index_path)
     assert result.exit_code == 0
 

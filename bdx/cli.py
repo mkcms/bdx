@@ -275,7 +275,9 @@ class IndexingOptionParamType(click.ParamType):
 
         return [CompletionItem(c) for c in matched]
 
-    def get_metavar(self, param: click.Parameter) -> str:
+    def get_metavar(
+        self, param: click.Parameter, _ctx: Optional[click.Context] = None
+    ) -> str:
         """Get the metavar for this option."""
         return "|".join([f"{o}=VALUE" for o in self.OPTIONS])
 
