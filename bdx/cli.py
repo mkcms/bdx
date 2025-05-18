@@ -17,7 +17,7 @@ from click.types import BoolParamType, IntRange
 import bdx
 from bdx import debug, error, info, log, make_progress_bar, trace
 # fmt: off
-from bdx.binary import BinaryDirectory, find_compilation_database
+from bdx.binary import BinaryDirectory, Exclusion, find_compilation_database
 from bdx.index import (IndexingOptions, PathField, SymbolIndex, _OptionalField,
                        delete_index, index_binary_directory, search_index)
 from bdx.query_parser import QueryParser
@@ -305,6 +305,16 @@ def cli():
     help="Treat all files as outdated to reindex them.",
 )
 @click.option(
+    "-e",
+    "--exclude",
+    help=(
+        "Exclude a glob pattern from indexing. Can be given multiple times."
+    ),
+    type=click.Path(),
+    multiple=True,
+    metavar="GLOB",
+)
+@click.option(
     "--delete",
     is_flag=True,
     help=(
@@ -314,11 +324,19 @@ def cli():
     ),
 )
 def index(
-    directory, index_path, opt, use_compilation_database, reindex, delete
+    directory,
+    index_path,
+    opt,
+    use_compilation_database,
+    reindex,
+    exclude,
+    delete,
 ):
     """Index the specified directory."""
     if delete:
         delete_index(index_path)
+
+    exclusions = [Exclusion(ex) for ex in exclude]
 
     options = IndexingOptions(**dict(opt))
 
@@ -327,6 +345,7 @@ def index(
             directory,
             index_path,
             options=options,
+            exclusions=exclusions,
             use_compilation_database=use_compilation_database,
             reindex=reindex,
         )

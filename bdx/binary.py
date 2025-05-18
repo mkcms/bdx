@@ -13,15 +13,16 @@ from datetime import datetime
 from enum import Enum
 from functools import cache, cached_property, total_ordering
 from pathlib import Path
-from typing import ClassVar, Iterable, Iterator, Optional
+from typing import ClassVar, Collection, Iterable, Iterator, Optional
 
+import wcmatch.glob as glob
 from elftools.elf.elffile import ELFFile
 from elftools.elf.relocation import Relocation, RelocationSection
 from elftools.elf.sections import Symbol as ELFSymbol
 from elftools.elf.sections import SymbolTableSection
 from sortedcontainers import SortedList
 
-from bdx import info, make_progress_bar, trace
+from bdx import debug, info, make_progress_bar, trace
 
 
 class NameDemangler:
@@ -473,10 +474,30 @@ def is_readable_elf_file(path: Path) -> bool:
 
 
 @dataclass(frozen=True)
+class Exclusion:
+    """Represents a glob pattern for excluding files to index."""
+
+    pattern: str
+
+    def matches(self, path: Path, root_dir: Path) -> bool:
+        """Return true if this exclusion pattern matches ``path``."""
+        flags = glob.GLOBSTAR
+        relative = path
+        if path.is_absolute():
+            relative = path.relative_to(root_dir)
+        return glob.globmatch(
+            path, self.pattern, root_dir=root_dir, flags=flags
+        ) or glob.globmatch(
+            relative, self.pattern, root_dir=root_dir, flags=flags
+        )
+
+
+@dataclass(frozen=True)
 class BinaryDirectory:
     """Represents a directory containing zero or more binary files."""
 
     path: Path
+    exclusions: Collection[Exclusion] = field(default_factory=list)
     last_mtime: datetime = datetime.fromtimestamp(0)
     previous_file_list: list[Path] = field(repr=False, default_factory=list)
     use_compilation_database: bool = False
@@ -543,6 +564,15 @@ class BinaryDirectory:
             )
 
         for file in files:
+            exclusion = self._find_exclusion(file)
+            if exclusion:
+                debug(
+                    "{}: Ignoring, excluded by user (pattern: {!r})",
+                    file,
+                    exclusion.pattern,
+                )
+                continue
+
             if is_readable_elf_file(file):
                 yield file
             else:
@@ -560,3 +590,9 @@ class BinaryDirectory:
         compdb = _read_compdb(path, path.stat().st_mtime_ns)
 
         return compdb.get_all_binary_files()
+
+    def _find_exclusion(self, path: Path) -> Optional[Exclusion]:
+        for excl in self.exclusions:
+            if excl.matches(path, self.path):
+                return excl
+        return None

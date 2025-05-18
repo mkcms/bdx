@@ -4,7 +4,7 @@ from pathlib import Path
 from random import shuffle
 from typing import Optional
 
-from bdx.binary import BinaryDirectory, NameDemangler
+from bdx.binary import BinaryDirectory, Exclusion, NameDemangler
 
 
 def create_fake_elf_file(path: Path, mtime: Optional[datetime] = None):
@@ -147,3 +147,190 @@ def test_find_deleted_files(tmp_path):
 
     assert set(changed_files) == set(files_to_modify)
     assert set(deleted_files) == set(files_to_delete)
+
+
+def test_find_files_with_exclusions(chdir, tmp_path):
+    with chdir(tmp_path):
+        create_fake_elf_file(tmp_path / "dir1" / "1.o")
+        create_fake_elf_file(tmp_path / "dir1" / "2.o")
+        create_fake_elf_file(tmp_path / "dir1" / "3.o")
+        create_fake_elf_file(tmp_path / "dir2" / "1.o")
+        create_fake_elf_file(tmp_path / "dir2" / "2.o")
+        create_fake_elf_file(tmp_path / "dir2" / "3.o")
+        create_fake_elf_file(tmp_path / "dir3" / "subdir" / "1.o")
+        create_fake_elf_file(tmp_path / "dir3" / "subdir" / "2.o")
+
+        bdir = BinaryDirectory(tmp_path, exclusions=[Exclusion("dir1/**")])
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set(
+            [
+                tmp_path / "dir2" / "1.o",
+                tmp_path / "dir2" / "2.o",
+                tmp_path / "dir2" / "3.o",
+                tmp_path / "dir3" / "subdir" / "1.o",
+                tmp_path / "dir3" / "subdir" / "2.o",
+            ]
+        )
+
+        bdir = BinaryDirectory(tmp_path, exclusions=[Exclusion("**")])
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set([])
+
+        bdir = BinaryDirectory(tmp_path, exclusions=[Exclusion("**/dir2/*")])
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set(
+            [
+                tmp_path / "dir1" / "1.o",
+                tmp_path / "dir1" / "2.o",
+                tmp_path / "dir1" / "3.o",
+                tmp_path / "dir3" / "subdir" / "1.o",
+                tmp_path / "dir3" / "subdir" / "2.o",
+            ]
+        )
+
+        bdir = BinaryDirectory(tmp_path, exclusions=[Exclusion("**/1.o")])
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set(
+            [
+                tmp_path / "dir1" / "2.o",
+                tmp_path / "dir1" / "3.o",
+                tmp_path / "dir2" / "2.o",
+                tmp_path / "dir2" / "3.o",
+                tmp_path / "dir3" / "subdir" / "2.o",
+            ]
+        )
+
+        bdir = BinaryDirectory(
+            tmp_path, exclusions=[Exclusion("**/1.o"), Exclusion("**/2.o")]
+        )
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set(
+            [
+                tmp_path / "dir1" / "3.o",
+                tmp_path / "dir2" / "3.o",
+            ]
+        )
+
+        bdir = BinaryDirectory(
+            tmp_path,
+            exclusions=[Exclusion("**/1.o"), Exclusion("**/subdir/2.o")],
+        )
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set(
+            [
+                tmp_path / "dir1" / "2.o",
+                tmp_path / "dir1" / "3.o",
+                tmp_path / "dir2" / "2.o",
+                tmp_path / "dir2" / "3.o",
+            ]
+        )
+
+
+def test_find_files_with_exclusions_2(chdir, tmp_path):
+    with chdir(tmp_path):
+        create_fake_elf_file(tmp_path / "dir1" / "1.o")
+        create_fake_elf_file(tmp_path / "dir1" / "subdir1" / "1.o")
+        create_fake_elf_file(tmp_path / "dir1" / "subdir1" / "2.o")
+        create_fake_elf_file(
+            tmp_path / "dir1" / "subdir1" / "nested-subdir1" / "1.o"
+        )
+        create_fake_elf_file(
+            tmp_path / "dir1" / "subdir1" / "nested-subdir1" / "2.o"
+        )
+        create_fake_elf_file(
+            tmp_path / "dir1" / "subdir1" / "nested-subdir1" / "3.o"
+        )
+        create_fake_elf_file(tmp_path / "dir1" / "subdir2" / "1.o")
+        create_fake_elf_file(tmp_path / "dir1" / "subdir2" / "2.o")
+
+        bdir = BinaryDirectory(tmp_path, exclusions=[Exclusion("**")])
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert changed_files == []
+
+        bdir = BinaryDirectory(
+            tmp_path, exclusions=[Exclusion("**/dir1/sub**/**")]
+        )
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set(
+            [
+                tmp_path / "dir1" / "1.o",
+            ]
+        )
+
+        bdir = BinaryDirectory(
+            tmp_path, exclusions=[Exclusion("**/dir1/sub*/*nested*/*")]
+        )
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set(
+            [
+                tmp_path / "dir1" / "1.o",
+                tmp_path / "dir1" / "subdir1" / "1.o",
+                tmp_path / "dir1" / "subdir1" / "2.o",
+                tmp_path / "dir1" / "subdir2" / "1.o",
+                tmp_path / "dir1" / "subdir2" / "2.o",
+            ]
+        )
+
+        bdir = BinaryDirectory(
+            tmp_path, exclusions=[Exclusion("**/*sub*/*nested*/*")]
+        )
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set(
+            [
+                tmp_path / "dir1" / "1.o",
+                tmp_path / "dir1" / "subdir1" / "1.o",
+                tmp_path / "dir1" / "subdir1" / "2.o",
+                tmp_path / "dir1" / "subdir2" / "1.o",
+                tmp_path / "dir1" / "subdir2" / "2.o",
+            ]
+        )
+
+        bdir = BinaryDirectory(
+            tmp_path, exclusions=[Exclusion("**/nested*/**")]
+        )
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set(
+            [
+                tmp_path / "dir1" / "1.o",
+                tmp_path / "dir1" / "subdir1" / "1.o",
+                tmp_path / "dir1" / "subdir1" / "2.o",
+                tmp_path / "dir1" / "subdir2" / "1.o",
+                tmp_path / "dir1" / "subdir2" / "2.o",
+            ]
+        )
+
+        bdir = BinaryDirectory(
+            tmp_path, exclusions=[Exclusion("**/sub*1/**/*.o")]
+        )
+        deleted_files = list(bdir.deleted_files())
+        changed_files = list(bdir.changed_files())
+        assert deleted_files == []
+        assert set(changed_files) == set(
+            [
+                tmp_path / "dir1" / "1.o",
+                tmp_path / "dir1" / "subdir2" / "1.o",
+                tmp_path / "dir1" / "subdir2" / "2.o",
+            ]
+        )
