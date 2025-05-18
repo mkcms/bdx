@@ -5,7 +5,7 @@ from shutil import rmtree
 import pytest
 
 # isort: off
-from bdx.binary import SymbolType
+from bdx.binary import Exclusion, SymbolType
 from bdx.index import (
     IndexingOptions,
     SymbolIndex,
@@ -281,6 +281,53 @@ def test_indexing_adds_source_field_with_compilation_database(
         assert symbols
         for symbol in symbols:
             assert symbol.source == fixture_path / "subdir" / "foo.c"
+
+
+def test_indexing_exclusions(fixture_path, tmp_path):
+    index_path = tmp_path / "index"
+    index_binary_directory(
+        fixture_path,
+        index_path,
+        IndexingOptions(),
+        exclusions=[Exclusion("**/*.cpp.o")],
+    )
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = list(index.search("*:*"))
+        assert symbols
+
+        for symbol in symbols:
+            assert not symbol.path.name.endswith(".cpp.o")
+    rmtree(index_path)
+
+    index_binary_directory(
+        fixture_path,
+        index_path,
+        IndexingOptions(),
+        exclusions=[Exclusion("**/*.c.o")],
+    )
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = list(index.search("*:*"))
+        assert symbols
+
+        for symbol in symbols:
+            assert symbol.path.name.endswith(".cpp.o")
+    rmtree(index_path)
+
+    index_binary_directory(
+        fixture_path,
+        index_path,
+        IndexingOptions(),
+        exclusions=[Exclusion("**/toplev.*"), Exclusion("**/subdir/*.cpp.o")],
+    )
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = list(index.search("*:*"))
+        assert symbols
+
+        paths = set([x.path for x in symbols])
+
+        assert fixture_path / "toplev.c.o" not in paths
+        assert fixture_path / "subdir" / "bar.cpp.o" not in paths
+    rmtree(index_path)
 
 
 def test_searching_by_wildcard(readonly_index):

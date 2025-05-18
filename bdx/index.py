@@ -38,6 +38,7 @@ from bdx import debug, detail_log, error, log, make_progress_bar, trace
 # isort: off
 from bdx.binary import (
     BinaryDirectory,
+    Exclusion,
     Symbol,
     SymbolType,
     read_symbols_in_file,
@@ -1025,10 +1026,14 @@ def index_binary_directory(
     options: IndexingOptions,
     use_compilation_database: bool = False,
     reindex: bool = False,
+    exclusions: Optional[Collection[Exclusion]] = None,
 ) -> IndexingStats:
     """Index the given directory."""
     stats = IndexingStats()
     debug("Options: {}", options)
+
+    if not exclusions:
+        exclusions = []
 
     bindir_path = Path(directory)
 
@@ -1040,11 +1045,12 @@ def index_binary_directory(
             mtime = datetime.fromtimestamp(0)
         else:
             mtime = index.mtime()
-        existing_files = list(index.all_files())
+        existing_files = set(index.all_files())
         bdir = BinaryDirectory(
-            bindir_path,
-            mtime,
-            existing_files,
+            path=bindir_path,
+            exclusions=exclusions,
+            last_mtime=mtime,
+            previous_file_list=list(existing_files),
             use_compilation_database=use_compilation_database,
         )
 

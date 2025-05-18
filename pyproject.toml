@@ -21,6 +21,7 @@ dependencies = [
     "pyelftools",
     "tqdm",
     "sortedcontainers",
+    "wcmatch",
 ]
 
 [project.optional-dependencies]

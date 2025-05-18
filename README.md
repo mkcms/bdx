@@ -58,7 +58,8 @@ Or you can specify the directory to index:
 
     bdx index -d ./build
 
-The indexer will only index files changed since last run.
+The indexer will only index files changed since last run.  With `--exclude`
+option you can choose directories/glob patterns to ignore.
 
 When indexing a large repository when a lot of files have changed, it's often
 better to use `--delete` option, to completely rebuild the index.  Removing
