@@ -75,6 +75,9 @@ Available options:
 - `num_processes` - number of parallel indexing processes (default=same as # of
   CPUs).
 
+- `demangle_names` - if True (the default), then symbol names are demangled and
+  saved to the database.
+
 - `index_relocations` - if True, all relocations will be applied and indexed.
   By default this is false.  Setting this to True will slow down indexing.
 
@@ -84,6 +87,9 @@ Available options:
 - `use_dwarfdump` - if True (the default), use `dwarfdump` program, if it's
   available, to find the source file for a compiled file, if it can't be found
   in any other way.
+
+- `save_filters` - if True (False by default), then exclusions provided with
+  `--exclude` option are saved for future runs.
 
 ### Disassembling ###
 

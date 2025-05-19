@@ -57,6 +57,7 @@ class IndexingOptions:
     index_relocations: bool = False
     min_symbol_size: int = 1
     use_dwarfdump: bool = True
+    save_filters: bool = False
 
 
 @dataclass(frozen=True)
@@ -705,6 +706,17 @@ class SymbolIndex:
         """Set the modification time of this index."""
         self.set_metadata("binary_dir", str(binary_dir).encode())
 
+    def exclusions(self) -> Collection[Exclusion]:
+        """Get exclusions for this index saved by previous indexing runs."""
+        if "__exclusions__" not in set(self.get_metadata_keys()):
+            return []
+
+        return pickle.loads(self.get_metadata("__exclusions__"))
+
+    def set_exclusions(self, exclusions: Collection[Exclusion]):
+        """Set the exclusions for this index for future indexing runs."""
+        self.set_metadata("__exclusions__", pickle.dumps(exclusions))
+
     @contextmanager
     def transaction(self):
         """Return a context manager for transactions in this SymbolIndex."""
@@ -1035,11 +1047,20 @@ def index_binary_directory(
     if not exclusions:
         exclusions = []
 
+    original_exclusions = list(exclusions)
+    exclusions = list(exclusions)
+
     bindir_path = Path(directory)
 
     with SymbolIndex.open(index_path, readonly=False) as index:
         if index.binary_dir() is None:
             index.set_binary_dir(bindir_path)
+
+        saved_exclusions = list(index.exclusions())
+        for excl in saved_exclusions:
+            debug("Loading saved exclusion: {}", excl)
+            if excl not in exclusions:
+                exclusions.append(excl)
 
         if reindex:
             mtime = datetime.fromtimestamp(0)
@@ -1077,6 +1098,10 @@ def index_binary_directory(
         ):
             index.delete_file(file)
             debug("File deleted: {}", file)
+
+        if options.save_filters:
+            saved_exclusions.extend(original_exclusions)
+        index.set_exclusions(saved_exclusions)
 
     with (
         sigint_catcher() as interrupted,

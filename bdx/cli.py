@@ -239,6 +239,7 @@ class IndexingOptionParamType(click.ParamType):
         "index_relocations": BoolParamType(),
         "min_symbol_size": IntRange(min=0),
         "use_dwarfdump": BoolParamType(),
+        "save_filters": BoolParamType(),
     }
 
     def convert(self, value, param, ctx):
@@ -309,7 +310,9 @@ def cli():
     "--exclude",
     help=(
         "Exclude a glob pattern or a directory from indexing. "
-        "Can be given multiple times."
+        "Can be given multiple times. "
+        "Each pattern is saved in the database for future runs, so it only "
+        "needs to be provided once."
     ),
     type=click.Path(),
     multiple=True,
