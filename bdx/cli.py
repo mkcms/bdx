@@ -240,6 +240,7 @@ class IndexingOptionParamType(click.ParamType):
         "min_symbol_size": IntRange(min=0),
         "use_dwarfdump": BoolParamType(),
         "save_filters": BoolParamType(),
+        "delete_saved_filters": BoolParamType(),
     }
 
     def convert(self, value, param, ctx):

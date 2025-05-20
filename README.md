@@ -91,6 +91,9 @@ Available options:
 - `save_filters` - if True (False by default), then exclusions provided with
   `--exclude` option are saved for future runs.
 
+- `delete_saved_filters` - if True (False by default), then delete all previous
+  `--exclude` exclusions saved with `save_filters` option.
+
 ### Disassembling ###
 
 After a directory is indexed, you can disassemble symbols matching a search
