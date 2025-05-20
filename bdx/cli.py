@@ -324,6 +324,12 @@ def cli():
         " have been modified/removed."
     ),
 )
+@click.option(
+    "-n",
+    "--dry-run",
+    is_flag=True,
+    help="Don't index, instead print out what would be done.",
+)
 def index(
     directory,
     index_path,
@@ -332,9 +338,10 @@ def index(
     reindex,
     exclude,
     delete,
+    dry_run,
 ):
     """Index the specified directory."""
-    if delete:
+    if delete and not dry_run:
         delete_index(index_path)
 
     exclusions = [Exclusion(ex) for ex in exclude]
@@ -349,6 +356,7 @@ def index(
             exclusions=exclusions,
             use_compilation_database=use_compilation_database,
             reindex=reindex,
+            dry_run=dry_run,
         )
     except BinaryDirectory.CompilationDatabaseNotFoundError as e:
         error(str(e))
