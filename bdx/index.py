@@ -58,6 +58,7 @@ class IndexingOptions:
     min_symbol_size: int = 1
     use_dwarfdump: bool = True
     save_filters: bool = False
+    delete_saved_filters: bool = False
 
 
 @dataclass(frozen=True)
@@ -1068,7 +1069,14 @@ def index_binary_directory(
         if index.binary_dir() is None and not dry_run:
             index.set_binary_dir(bindir_path)
 
-        saved_exclusions = list(index.exclusions())
+        if options.delete_saved_filters:
+            for excl in index.exclusions():
+                debug("Deleting saved exclusion {}", excl)
+            if not dry_run:
+                index.set_exclusions([])
+            saved_exclusions = []
+        else:
+            saved_exclusions = list(index.exclusions())
         for excl in saved_exclusions:
             debug("Loading saved exclusion: {}", excl)
             if excl not in exclusions:

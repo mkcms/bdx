@@ -380,6 +380,26 @@ def test_indexing_uses_persistent_exclusions(fixture_path, tmp_path):
         assert all([not p.name.endswith(".cpp.o") for p in paths])
 
 
+def test_indexing_delete_saved_filters(fixture_path, tmp_path):
+    index_path = tmp_path / "index"
+    index_binary_directory(
+        fixture_path,
+        index_path,
+        IndexingOptions(save_filters=True),
+        exclusions=[Exclusion("**/*.cpp.o")],
+    )
+    index_binary_directory(
+        fixture_path,
+        index_path,
+        IndexingOptions(delete_saved_filters=True),
+        exclusions=[],
+    )
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = list(index.search("*:*"))
+        paths = [s.path for s in symbols]
+        assert any([p.name.endswith(".cpp.o") for p in paths])
+
+
 def test_searching_by_wildcard(readonly_index):
     symbols = set(readonly_index.search("name:a_*"))
     assert symbols
