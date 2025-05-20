@@ -81,4 +81,9 @@ def error(msg, *args):
 def make_progress_bar(*args, **kwargs):
     """Return ``tqdm`` progress bar if available."""
     disable = os.getenv("BDX_DISABLE_PROGRESS_BAR") is not None
+    try:
+        disable |= not os.isatty(sys.stdout.fileno())
+    except IOError:
+        # In case fileno() is unsupported
+        pass
     return tqdm.tqdm(*args, disable=disable, **kwargs)
