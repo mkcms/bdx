@@ -593,11 +593,13 @@ class SymbolIndex:
         return index
 
     @staticmethod
-    def open_shard(directory: Path | str) -> "SymbolIndex":
+    def open_shard(
+        directory: Path | str, readonly: bool = False
+    ) -> "SymbolIndex":
         """Open a writable shard for index in given directory."""
         for path in SymbolIndex.generate_shard_paths(Path(directory) / "db"):
             try:
-                return SymbolIndex(path, readonly=False, is_shard=True)
+                return SymbolIndex(path, readonly=readonly, is_shard=True)
             except Exception:
                 pass
 
@@ -928,11 +930,13 @@ class _WorkerPool:
         should_quit: Callable[[], bool],
         index_path: Path,
         use_compilation_database: bool,
+        dry_run: bool,
     ):
         self.options = options
         self.should_quit = should_quit
         self.index_path = index_path
         self.use_compilation_database = use_compilation_database
+        self.dry_run = dry_run
 
         self._job_queue: Queue[Path]
         self._result_queue: Queue[int]
@@ -1025,9 +1029,16 @@ class _WorkerPool:
                 except QueueEmpty:
                     continue
 
-                result = _index_single_file(
-                    index, path, self.options, self.use_compilation_database
-                )
+                if self.dry_run:
+                    print(f"index {path}")
+                    result = 1
+                else:
+                    result = _index_single_file(
+                        index,
+                        path,
+                        self.options,
+                        self.use_compilation_database,
+                    )
 
                 self._result_queue.put(result)
 
@@ -1039,6 +1050,7 @@ def index_binary_directory(
     use_compilation_database: bool = False,
     reindex: bool = False,
     exclusions: Optional[Collection[Exclusion]] = None,
+    dry_run: bool = False,
 ) -> IndexingStats:
     """Index the given directory."""
     stats = IndexingStats()
@@ -1052,8 +1064,8 @@ def index_binary_directory(
 
     bindir_path = Path(directory)
 
-    with SymbolIndex.open(index_path, readonly=False) as index:
-        if index.binary_dir() is None:
+    with SymbolIndex.open(index_path, readonly=dry_run) as index:
+        if index.binary_dir() is None and not dry_run:
             index.set_binary_dir(bindir_path)
 
         saved_exclusions = list(index.exclusions())
@@ -1084,24 +1096,35 @@ def index_binary_directory(
         stats.num_files_changed = len(changed_files)
         stats.num_files_deleted = len(deleted_files)
 
+        def unindex_file(path, is_deleted):
+            if dry_run:
+                if path in existing_files:
+                    if is_deleted:
+                        print(f"unindex-deleted-file {path}")
+                    else:
+                        print(f"unindex-outdated-file {path}")
+            else:
+                index.delete_file(path)
+
         for file in make_progress_bar(
             changed_files,
             desc="Removing outdated files",
             leave=False,
         ):
-            index.delete_file(file)
+            unindex_file(file, is_deleted=False)
             debug("File modified: {}", file)
         for file in make_progress_bar(
             deleted_files,
             desc="Removing deleted files",
             leave=False,
         ):
-            index.delete_file(file)
+            unindex_file(file, is_deleted=True)
             debug("File deleted: {}", file)
 
         if options.save_filters:
             saved_exclusions.extend(original_exclusions)
-        index.set_exclusions(saved_exclusions)
+        if not dry_run:
+            index.set_exclusions(saved_exclusions)
 
     with (
         sigint_catcher() as interrupted,
@@ -1110,6 +1133,7 @@ def index_binary_directory(
             interrupted,
             index_path,
             use_compilation_database=use_compilation_database,
+            dry_run=dry_run,
         ) as pool,
     ):
         perfile_iterator = pool.index_files(changed_files)
