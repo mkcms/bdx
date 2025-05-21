@@ -397,10 +397,16 @@ def _complete_query(
     directory = ctx.params["directory"]
     index_path = ctx.params["index_path"]
 
+    did_guess_directory = False
+
     if not directory:
         directory = default_directory(ctx)
+        did_guess_directory = True
     if not index_path:
-        index_path = SymbolIndex.default_path(directory)
+        if not did_guess_directory:
+            index_path = SymbolIndex.default_path(directory)
+        else:
+            index_path = guess_index_path_for_directory(directory)
 
     query = ctx.params[param.name or "query"] or []
     shell = os.environ.get("_BDX_COMPLETE", "").lower()
