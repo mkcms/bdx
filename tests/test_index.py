@@ -1,6 +1,8 @@
+import os
 import shutil
 from pathlib import Path
 from shutil import rmtree
+from subprocess import check_call
 
 import pytest
 
@@ -15,6 +17,12 @@ from bdx.index import (
 from bdx.query_parser import QueryParser
 
 # isort: on
+
+
+def _compile_file(output_file: Path, source: str, flags: list[str], ext="c"):
+    source_file = output_file.parent / f"{output_file.stem}.{ext}"
+    source_file.write_text(source)
+    check_call(["gcc", str(source_file), "-o", str(output_file), *flags])
 
 
 def test_indexing(fixture_path, tmp_path):
@@ -398,6 +406,60 @@ def test_indexing_delete_saved_filters(fixture_path, tmp_path):
         symbols = list(index.search("*:*"))
         paths = [s.path for s in symbols]
         assert any([p.name.endswith(".cpp.o") for p in paths])
+
+
+def test_indexing_triggered_after_file_was_updated(tmp_path):
+    dir = tmp_path / "build"
+    dir.mkdir()
+
+    file: Path = dir / "foo.o"
+    index_path = tmp_path / "index"
+
+    _compile_file(file, "void foo() {}", ["-c"])
+    index_binary_directory(dir, index_path, IndexingOptions())
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = {s.name: s for s in index.search("*:*")}
+        assert "foo" in symbols
+
+    _compile_file(file, "void bar() {}", ["-c"])
+    index_binary_directory(dir, index_path, IndexingOptions())
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = {s.name: s for s in index.search("*:*")}
+        assert "foo" not in symbols
+        assert "bar" in symbols
+
+    st = file.stat()
+    _compile_file(file, "void quux() {}", ["-c"])
+    os.utime(file, ns=(st.st_atime_ns + 1, st.st_mtime_ns + 1))
+    index_binary_directory(dir, index_path, IndexingOptions())
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = {s.name: s for s in index.search("*:*")}
+        assert "foo" not in symbols
+        assert "bar" not in symbols
+        assert "quux" in symbols
+
+
+def test_indexing_not_triggered_if_mtime_not_changed(tmp_path):
+    dir = tmp_path / "build"
+    dir.mkdir()
+
+    file: Path = dir / "foo.o"
+    index_path = tmp_path / "index"
+
+    _compile_file(file, "void foo() {}", ["-c"])
+    index_binary_directory(dir, index_path, IndexingOptions())
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = {s.name: s for s in index.search("*:*")}
+        assert "foo" in symbols
+
+    st = file.stat()
+    _compile_file(file, "void quux() {}", ["-c"])
+    os.utime(file, ns=(st.st_atime_ns, st.st_mtime_ns))
+    index_binary_directory(dir, index_path, IndexingOptions())
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        symbols = {s.name: s for s in index.search("*:*")}
+        assert "foo" in symbols
+        assert "quux" not in symbols
 
 
 def test_searching_by_wildcard(readonly_index):

@@ -23,20 +23,22 @@ def setup_tmp_dir(
     file_list: list[Path],
     files_to_delete: Optional[list[Path]] = None,
     files_to_modify: Optional[list[Path]] = None,
-) -> tuple[list[Path], list[Path], list[Path], datetime]:
+) -> tuple[list[Path], list[Path], list[Path], int]:
     if files_to_delete is None:
         files_to_delete = []
     if files_to_modify is None:
         files_to_modify = []
 
-    max_mtime = datetime.now() - timedelta(seconds=1)
+    mtime = datetime.now() - timedelta(seconds=1)
+    mtime_ns = 0
     for f in file_list:
-        create_fake_elf_file(f, max_mtime)
+        create_fake_elf_file(f, mtime)
+        mtime_ns = f.stat().st_mtime_ns
     for f in files_to_delete:
         f.unlink()
     for f in files_to_modify:
         f.touch()
-    return file_list, files_to_delete, files_to_modify, max_mtime
+    return file_list, files_to_delete, files_to_modify, mtime_ns
 
 
 def shuffled_int_range(stop):
@@ -101,7 +103,7 @@ def test_find_changed_files(tmp_path):
 
     bdir = BinaryDirectory(
         tmp_path,
-        last_mtime=max_mtime,
+        last_mtime_ns=max_mtime,
         previous_file_list=file_list,
     )
     deleted_files = list(bdir.deleted_files())
@@ -139,7 +141,7 @@ def test_find_deleted_files(tmp_path):
 
     bdir = BinaryDirectory(
         tmp_path,
-        last_mtime=max_mtime,
+        last_mtime_ns=max_mtime,
         previous_file_list=file_list,
     )
     changed_files = list(bdir.changed_files())
