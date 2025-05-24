@@ -11,7 +11,6 @@ from collections import defaultdict
 from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
 from enum import Enum
 from functools import cache
 from pathlib import Path
@@ -688,16 +687,26 @@ class SymbolIndex:
             raise ValueError(msg)
         self._live_writable_db().set_metadata(key, metadata)
 
-    def mtime(self) -> datetime:
-        """Return the max modification time of this index."""
+    def mtime(self) -> int:
+        """Return the max modification time of this index in nanoseconds."""
         db = self._live_db()
         field_data = self.schema["mtime"]
-        val = db.get_value_upper_bound(field_data.slot)  # pyright: ignore
+        slot = field_data.slot  # pyright: ignore
+        val = db.get_value_upper_bound(slot)
         if not val:
-            return datetime.fromtimestamp(0)
+            return 0
 
-        val_int = xapian.sortable_unserialise(val)
-        return datetime.fromtimestamp(val_int / 1e9)
+        # Search for symbol which has the known highest mtime.  We
+        # can't just use Xapian.sortable_unserialise() on ``val``, as
+        # that converts the value to a float, and we lose precision,
+        # causing errors and unexpected results, e.g. files won't be
+        # treated as modified even though they were.
+
+        query = xapian.Query(xapian.Query.OP_VALUE_RANGE, slot, val, val)
+        results = self.search(query, limit=1)
+        if results.count == 0:
+            return 0
+        return list(results)[0].mtime
 
     def binary_dir(self) -> Optional[Path]:
         """Get binary directory of this index, set by ``set_binary_dir``."""
@@ -1083,14 +1092,14 @@ def index_binary_directory(
                 exclusions.append(excl)
 
         if reindex:
-            mtime = datetime.fromtimestamp(0)
+            mtime_ns = 0
         else:
-            mtime = index.mtime()
+            mtime_ns = index.mtime()
         existing_files = set(index.all_files())
         bdir = BinaryDirectory(
             path=bindir_path,
             exclusions=exclusions,
-            last_mtime=mtime,
+            last_mtime_ns=mtime_ns,
             previous_file_list=list(existing_files),
             use_compilation_database=use_compilation_database,
         )

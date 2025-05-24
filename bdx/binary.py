@@ -498,7 +498,7 @@ class BinaryDirectory:
 
     path: Path
     exclusions: Collection[Exclusion] = field(default_factory=list)
-    last_mtime: datetime = datetime.fromtimestamp(0)
+    last_mtime_ns: int = 0
     previous_file_list: list[Path] = field(repr=False, default_factory=list)
     use_compilation_database: bool = False
 
@@ -528,16 +528,17 @@ class BinaryDirectory:
             desc="Finding changed files",
             leave=False,
         ):
-            mtime = datetime.fromtimestamp(path.stat().st_mtime)
+            st = path.stat()
             is_new = path not in previous_state
-            is_changed = not is_new and self.last_mtime < mtime
+            is_changed = not is_new and self.last_mtime_ns < st.st_mtime_ns
 
             trace(
-                "{}: is_new={} is_changed={} mtime={}",
+                "{}: is_new={} is_changed={} mtime={} ({})",
                 path,
                 is_new,
                 is_changed,
-                mtime,
+                datetime.fromtimestamp(st.st_mtime),
+                st.st_mtime_ns,
             )
 
             if is_new or is_changed:
