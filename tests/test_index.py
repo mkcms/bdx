@@ -9,6 +9,7 @@ import pytest
 # isort: off
 from bdx.binary import Exclusion, SymbolType
 from bdx.index import (
+    MAX_TERM_SIZE,
     IndexingOptions,
     SymbolIndex,
     SymbolNameField,
@@ -460,6 +461,27 @@ def test_indexing_not_triggered_if_mtime_not_changed(tmp_path):
         symbols = {s.name: s for s in index.search("*:*")}
         assert "foo" in symbols
         assert "quux" not in symbols
+
+
+def test_indexing_very_long_path(tmp_path):
+    index_path = tmp_path / "index"
+    dir = tmp_path / "build"
+    dir.mkdir()
+
+    filename = "0" * (os.pathconf(tmp_path, "PC_NAME_MAX") - 2) + ".o"
+    file: Path = dir / filename
+    short_file: Path = dir / "short.o"
+
+    assert (
+        len(str(file)) + len(SymbolIndex.SCHEMA["path"].prefix) > MAX_TERM_SIZE
+    )
+
+    _compile_file(file, "void foo() {}", ["-c"])
+    _compile_file(short_file, "void shortfile() {}", ["-c"])
+    index_binary_directory(dir, index_path, IndexingOptions())
+    with SymbolIndex.open(index_path, readonly=True) as index:
+        all_files = sorted(index.all_files())
+        assert all_files == [file, short_file]
 
 
 def test_searching_by_wildcard(readonly_index):

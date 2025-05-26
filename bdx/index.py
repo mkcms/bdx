@@ -761,10 +761,26 @@ class SymbolIndex:
 
     def all_files(self) -> Iterator[Path]:
         """Yield all the files indexed in this SymbolIndex."""
+        seen_paths: set[Path] = set()
+
         for value in self.iter_prefix("path", ""):
-            path = Path(value)
-            if path.is_absolute():
-                yield path
+            # Check if the path stored in database has been truncated
+            # because it's length exceeded MAX_TERM_SIZE.  If so, then
+            # we need to search this term by wildcard and return all
+            # paths that are actually stored in the data of each
+            # document.
+            raw_term = self.schema["path"].prefix.encode() + value.encode()
+            if len(raw_term) == MAX_TERM_SIZE:
+                query = f"path:{value}*"
+                results = self.search(query)
+                paths = set([x.path for x in results]).difference(seen_paths)
+                seen_paths.update(paths)
+                yield from paths
+            else:
+                path = Path(value)
+                if path.is_absolute() and path not in seen_paths:
+                    seen_paths.add(path)
+                    yield path
 
     def iter_prefix(self, field: str, value_prefix: str) -> Iterator[str]:
         """Return all the possible values for ``field`` with given prefix."""
