@@ -326,10 +326,20 @@ def cli():
     ),
 )
 @click.option(
+    "--delete-metadata",
+    is_flag=True,
+    help=(
+        "With --delete, also delete all database metadata. "
+        "Effectively this removes all database files."
+    ),
+)
+@click.option(
     "-n",
     "--dry-run",
     is_flag=True,
-    help="Don't index, instead print out what would be done.",
+    help=(
+        "Don't actually modify anything, instead print out what would be done."
+    ),
 )
 def index(
     directory,
@@ -339,11 +349,15 @@ def index(
     reindex,
     exclude,
     delete,
+    delete_metadata,
     dry_run,
 ):
     """Index the specified directory."""
-    if delete and not dry_run:
-        delete_index(index_path)
+    if delete_metadata and not delete:
+        msg = "--delete-metadata does not make sense without --delete"
+        raise click.BadArgumentUsage(msg)
+    if delete:
+        delete_index(index_path, metadata_too=delete_metadata, dry_run=dry_run)
 
     exclusions = [Exclusion(ex) for ex in exclude]
 

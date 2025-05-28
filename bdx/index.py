@@ -1186,17 +1186,30 @@ def index_binary_directory(
     return stats
 
 
-def delete_index(index_path: Path):
-    """Delete index at given path."""
+def delete_index(index_path: Path, metadata_too=False, dry_run=False):
+    """Delete index at given path.
+
+    If ``metadata_too``, then delete ALL database files.
+    """
     if not index_path.exists():
         log("Index does not exist - not deleting")
         return
+
+    def log_if_dry_run(path, kind):
+        if dry_run:
+            print("would delete {} {}".format(kind, path))
+        else:
+            debug("deleting {}", kind, path)
 
     files_to_remove: list[Path] = []
     dirs_to_remove: list[Path] = []
 
     with SymbolIndex.open(index_path, readonly=False) as index:
-        for shard_path in [index.path, *index.shards()]:
+        shards = list(index.shards())
+        if metadata_too:
+            shards.insert(0, index.path)
+
+        for shard_path in shards:
             required_files = [
                 shard_path / "flintlock",
                 shard_path / "iamglass",
@@ -1223,15 +1236,19 @@ def delete_index(index_path: Path):
             dirs_to_remove.append(shard_path)
 
     for file in files_to_remove:
-        debug("Deleting db file: {}", file)
-        file.unlink()
+        log_if_dry_run(file, "db file")
+        if not dry_run:
+            file.unlink()
 
     for dir in dirs_to_remove:
-        debug("Deleting db directory: {}", dir)
-        dir.rmdir()
+        log_if_dry_run(dir, "db directory")
+        if not dry_run:
+            dir.rmdir()
 
-    debug("Deleting index directory: {}", index_path)
-    index_path.rmdir()
+    if metadata_too:
+        log_if_dry_run(index_path, "index directory")
+        if not dry_run:
+            index_path.rmdir()
 
 
 @dataclass(frozen=True)
