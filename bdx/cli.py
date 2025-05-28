@@ -256,7 +256,8 @@ class IndexingOptionParamType(click.ParamType):
         try:
             return (k, self.CONVERTERS[k].convert(v, param, ctx))
         except click.BadParameter as e:
-            raise click.BadParameter(f"{k}: {e}") from e
+            msg = f"{k}: {e}"
+            raise click.BadParameter(msg) from e
 
     def shell_complete(
         self, ctx: click.Context, param: click.Parameter, incomplete: str
