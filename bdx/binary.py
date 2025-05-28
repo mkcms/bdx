@@ -22,7 +22,7 @@ from elftools.elf.sections import Symbol as ELFSymbol
 from elftools.elf.sections import SymbolTableSection
 from sortedcontainers import SortedList
 
-from bdx import debug, info, make_progress_bar, trace
+from bdx import debug, info, log, make_progress_bar, trace
 
 
 class NameDemangler:
@@ -313,6 +313,9 @@ def _read_symbols_in_file(
     use_dwarfdump: bool,
 ) -> list[Symbol]:
     symtab = elf.get_section_by_name(".symtab")
+    if symtab is None:
+        log("warning: {}: .symtab section does not exist", file, symtab)
+        return []
     if not isinstance(symtab, SymbolTableSection):
         msg = ".symtab is not a SymbolTableSection"
         raise RuntimeError(msg)
