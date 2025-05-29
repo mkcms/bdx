@@ -1,16 +1,13 @@
 import json
 import re
 import subprocess
+from pathlib import Path
 from typing import Optional
 
 import pytest
-
-# isort: off
-from bdx.cli import cli
 from click.testing import CliRunner, Result
-from pathlib import Path
 
-# isort: on
+from bdx.cli import cli
 
 
 @pytest.fixture

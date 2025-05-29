@@ -4,13 +4,10 @@ from pathlib import Path
 
 import pytest
 import xapian
+from pytest import fixture
 
-# isort: off
 from bdx.index import DatabaseField, EnumField, IntegerField, PathField, Schema
 from bdx.query_parser import QueryParser
-
-# isort: on
-from pytest import fixture
 
 AND = xapian.Query.OP_AND
 OR = xapian.Query.OP_OR

@@ -6,7 +6,6 @@ from subprocess import check_call
 
 import pytest
 
-# isort: off
 from bdx.binary import Exclusion, SymbolType
 from bdx.index import (
     MAX_TERM_SIZE,
@@ -16,8 +15,6 @@ from bdx.index import (
     index_binary_directory,
 )
 from bdx.query_parser import QueryParser
-
-# isort: on
 
 
 def _compile_file(output_file: Path, source: str, flags: list[str], ext="c"):

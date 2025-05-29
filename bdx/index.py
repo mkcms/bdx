@@ -16,8 +16,6 @@ from functools import cache
 from pathlib import Path
 from queue import Empty as QueueEmpty
 from queue import Queue
-
-# isort: off
 from typing import (
     Any,
     Callable,
@@ -29,12 +27,9 @@ from typing import (
     Type,
 )
 
-# isort: on
 import xapian
 
 from bdx import debug, detail_log, error, log, make_progress_bar, trace
-
-# isort: off
 from bdx.binary import (
     BinaryDirectory,
     Exclusion,
@@ -43,7 +38,6 @@ from bdx.binary import (
     read_symbols_in_file,
 )
 
-# isort: on
 MAX_TERM_SIZE = 244
 
 

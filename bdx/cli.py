@@ -16,13 +16,17 @@ from click.types import BoolParamType, IntRange
 
 import bdx
 from bdx import debug, error, info, log, make_progress_bar, trace
-# fmt: off
 from bdx.binary import BinaryDirectory, Exclusion, find_compilation_database
-from bdx.index import (IndexingOptions, PathField, SymbolIndex, _OptionalField,
-                       delete_index, index_binary_directory, search_index)
+from bdx.index import (
+    IndexingOptions,
+    PathField,
+    SymbolIndex,
+    _OptionalField,
+    delete_index,
+    index_binary_directory,
+    search_index,
+)
 from bdx.query_parser import QueryParser
-
-# fmt: on
 
 try:
     import bdx.graph

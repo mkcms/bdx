@@ -5,15 +5,11 @@ from uuid import uuid4
 
 import pytest
 
-# isort: off
 from bdx.index import (
     IndexingOptions,
     SymbolIndex,
     index_binary_directory,
 )
-
-# isort: on
-
 
 FIXTURE_PATH = Path(__file__).parent / "fixture"
 
