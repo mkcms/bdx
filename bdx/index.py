@@ -1084,7 +1084,9 @@ def index_binary_directory(
 
     bindir_path = Path(directory)
 
-    with SymbolIndex.open(index_path, readonly=dry_run) as index:
+    with SymbolIndex.open(
+        index_path, readonly=dry_run and index_path.exists()
+    ) as index:
         if index.binary_dir() is None and not dry_run:
             index.set_binary_dir(bindir_path)
 
