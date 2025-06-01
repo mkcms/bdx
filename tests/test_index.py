@@ -518,6 +518,20 @@ def test_searching_by_exact_name(fixture_path, readonly_index):
     assert not_matching_exactly[2].name == "uses_foo"
 
 
+def test_searching_by_exact_name_2(fixture_path, readonly_index):
+    symbols = list(
+        readonly_index.search('fullname:"CppCamelCaseSymbol(char const*)"')
+    )
+    symbols2 = list(
+        readonly_index.search("fullname:_Z18CppCamelCaseSymbolPKc")
+    )
+
+    assert symbols
+    assert symbols == symbols2
+
+    assert symbols[0].name == "_Z18CppCamelCaseSymbolPKc"
+
+
 def test_searching_camel_case(readonly_index):
     symbols = set(readonly_index.search("camel"))
     assert symbols

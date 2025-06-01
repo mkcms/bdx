@@ -25,6 +25,7 @@ from typing import (
     List,
     Optional,
     Type,
+    Union,
 )
 
 import xapian
@@ -62,9 +63,9 @@ class DatabaseField:
     prefix: str
 
     # This DatabaseField will be responsible for indexing the
-    # following key/attribute of each document (Symbol) added to the
-    # index.
-    key: str
+    # following key(s)/attribute(s) of each document (Symbol) added to
+    # the index.
+    key: Union[str, list[str]]
 
     def index(self, document: xapian.Document, value: Any):
         """Index ``value`` in the ``document``."""
@@ -418,7 +419,11 @@ class Schema(Mapping):
                 msg = f"'{db_field.name}' is duplicated in the schema"
                 raise ValueError(msg)
             self._field_dict[db_field.name] = db_field
-            self._handlers[db_field.key].append(db_field)
+            if isinstance(db_field.key, str):
+                self._handlers[db_field.key].append(db_field)
+            else:
+                for key in db_field.key:
+                    self._handlers[key].append(db_field)
 
     def __getitem__(self, key):
         if not self.fields:
@@ -470,7 +475,13 @@ class SymbolIndex:
             optional_field(
                 SymbolNameField("demangled", "XD", key="demangled")
             ),
-            DatabaseField("fullname", "XFN", key="name"),
+            optional_field(
+                # This field is optional as `demangled' attribute can
+                # be None.  In case it is None, this field will still
+                # be indexed, as `name' is not optional, but it will
+                # not index the None value.
+                DatabaseField("fullname", "XFN", key=["name", "demangled"])
+            ),
             DatabaseField("section", "XSN", key="section"),
             IntegerField("address", "XA", slot=0, key="address"),
             IntegerField("size", "XSZ", slot=1, key="size"),
