@@ -759,10 +759,17 @@ class SymbolIndex:
         document.set_data(pickle.dumps(symbol))
         db.add_document(document)
 
-    def delete_file(self, file: Path):
-        """Delete all documents for the given file path."""
-        term_with_prefix = self.schema["path"].prefix + str(file)
-        self._live_writable_db().delete_document(term_with_prefix)
+    def replace_symbol(self, old_document: xapian.Document, symbol: Symbol):
+        """Replace an existing document."""
+        db = self._live_writable_db()
+        new_document = xapian.Document()
+        self.schema.index_document(new_document, **asdict(symbol))
+        new_document.set_data(pickle.dumps(symbol))
+        db.replace_document(old_document.get_docid(), new_document)
+
+    def delete_document(self, doc: xapian.Document):
+        """Delete the given document from this index."""
+        self._live_writable_db().delete_document(doc.get_docid())
 
     def all_files(self) -> Iterator[Path]:
         """Yield all the files indexed in this SymbolIndex."""
@@ -786,6 +793,22 @@ class SymbolIndex:
                 if path.is_absolute() and path not in seen_paths:
                     seen_paths.add(path)
                     yield path
+
+    def get_docs_for_path(self, path: Path) -> list[xapian.Document]:
+        """Get all documents for given path."""
+        raw_term = self.schema["path"].prefix.encode() + str(path).encode()
+        raw_term = raw_term[:MAX_TERM_SIZE]
+
+        db = self._live_db()
+        postlist: xapian.PostingIter = db.postlist(raw_term)  # pyright: ignore
+
+        docs = []
+
+        for it in postlist:
+            doc = db.get_document(it.docid)
+            docs.append(doc)
+
+        return docs
 
     def iter_prefix(self, field: str, value_prefix: str) -> Iterator[str]:
         """Return all the possible values for ``field`` with given prefix."""
@@ -896,6 +919,7 @@ def _index_single_file(
     file: Path,
     options: IndexingOptions,
     use_compilation_database: bool,
+    outdated_documents: list[xapian.Document],
 ) -> int:
     try:
         symtab = read_symbols_in_file(
@@ -923,7 +947,10 @@ def _index_single_file(
             symbol.mtime,
         )
 
-        index.add_symbol(symbol)
+        if outdated_documents:
+            index.replace_symbol(outdated_documents.pop(), symbol)
+        else:
+            index.add_symbol(symbol)
 
         num += 1
 
@@ -931,20 +958,22 @@ def _index_single_file(
         trace("{}: No symbols found", file)
         # Add a single document if there are no symbols.  Otherwise,
         # we would always treat it as unindexed.
-        index.add_symbol(
-            Symbol(
-                path=file,
-                source=None,
-                name="",
-                demangled=None,
-                section="",
-                address=0,
-                size=0,
-                type=SymbolType.NOTYPE,
-                relocations=list(),
-                mtime=file.stat().st_mtime_ns,
-            )
+        symbol = Symbol(
+            path=file,
+            source=None,
+            name="",
+            demangled=None,
+            section="",
+            address=0,
+            size=0,
+            type=SymbolType.NOTYPE,
+            relocations=list(),
+            mtime=file.stat().st_mtime_ns,
         )
+        if outdated_documents:
+            index.replace_symbol(outdated_documents.pop(), symbol)
+        else:
+            index.add_symbol(symbol)
         num += 1
 
     trace("{}: Adding {} symbol(s) to index", file, num)
@@ -960,12 +989,14 @@ class _WorkerPool:
         options: IndexingOptions,
         should_quit: Callable[[], bool],
         index_path: Path,
+        files_to_delete: Collection[Path],
         use_compilation_database: bool,
         dry_run: bool,
     ):
         self.options = options
         self.should_quit = should_quit
         self.index_path = index_path
+        self.files_to_delete = set(files_to_delete)
         self.use_compilation_database = use_compilation_database
         self.dry_run = dry_run
 
@@ -1050,6 +1081,20 @@ class _WorkerPool:
             SymbolIndex.open_shard(self.index_path) as index,
             index.transaction(),
         ):
+            deletable_files = set(self.files_to_delete).intersection(
+                set(index.all_files())
+            )
+
+            outdated_documents: list[xapian.Document] = []
+            for f in deletable_files:
+                docs = index.get_docs_for_path(f)
+                outdated_documents.extend(docs)
+
+            debug(
+                "There are {} outdated documents to recycle",
+                len(outdated_documents),
+            )
+
             while not self._stop_event.is_set():
                 parent = mp.parent_process()
                 if parent is not None and not parent.is_alive():
@@ -1069,9 +1114,19 @@ class _WorkerPool:
                         path,
                         self.options,
                         self.use_compilation_database,
+                        outdated_documents,
                     )
 
                 self._result_queue.put(result)
+
+            trace(
+                "There are {} outdated documents to delete",
+                len(outdated_documents),
+            )
+
+            if not self.dry_run:
+                for doc in outdated_documents:
+                    index.delete_document(doc)
 
 
 def index_binary_directory(
@@ -1136,30 +1191,19 @@ def index_binary_directory(
         stats.num_files_changed = len(changed_files)
         stats.num_files_deleted = len(deleted_files)
 
-        def unindex_file(path, is_deleted):
-            if dry_run:
-                if path in existing_files:
-                    if is_deleted:
-                        print(f"unindex-deleted-file {path}")
-                    else:
-                        print(f"unindex-outdated-file {path}")
-            else:
-                index.delete_file(path)
+        def log_unindex_file(path, is_deleted):
+            if dry_run and path in existing_files:
+                if is_deleted:
+                    print(f"unindex-deleted-file {path}")
+                    debug("File deleted: {}", file)
+                else:
+                    print(f"unindex-outdated-file {path}")
+                    debug("File modified: {}", file)
 
-        for file in make_progress_bar(
-            changed_files,
-            desc="Removing outdated files",
-            leave=False,
-        ):
-            unindex_file(file, is_deleted=False)
-            debug("File modified: {}", file)
-        for file in make_progress_bar(
-            deleted_files,
-            desc="Removing deleted files",
-            leave=False,
-        ):
-            unindex_file(file, is_deleted=True)
-            debug("File deleted: {}", file)
+        for file in changed_files:
+            log_unindex_file(file, is_deleted=False)
+        for file in deleted_files:
+            log_unindex_file(file, is_deleted=True)
 
         if options.save_filters:
             saved_exclusions.extend(original_exclusions)
@@ -1172,6 +1216,7 @@ def index_binary_directory(
             options,
             interrupted,
             index_path,
+            files_to_delete=changed_files + deleted_files,
             use_compilation_database=use_compilation_database,
             dry_run=dry_run,
         ) as pool,
