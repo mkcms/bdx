@@ -827,7 +827,7 @@ class SymbolIndex:
 
     def make_query_parser(self):
         """Return a query parser object for this index."""
-        from bdx.query_parser import QueryParser
+        from bdx.query_parser import QueryParser  # noqa: PLC0415
 
         return QueryParser(
             SymbolIndex.SCHEMA,
