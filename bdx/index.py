@@ -885,6 +885,10 @@ class IndexingStats:
     num_files_deleted: int = 0
     num_symbols_indexed: int = 0
 
+    exclusion_stats: dict[Exclusion, int] = field(
+        repr=False, default_factory=dict
+    )
+
 
 @contextmanager
 def sigint_catcher() -> Iterator[Callable[[], bool]]:
@@ -1190,6 +1194,7 @@ def index_binary_directory(
 
         stats.num_files_changed = len(changed_files)
         stats.num_files_deleted = len(deleted_files)
+        stats.exclusion_stats.update(bdir.exclusion_stats)
 
         def log_unindex_file(path, is_deleted):
             if dry_run and path in existing_files:

@@ -383,11 +383,17 @@ def index(
         exit(1)
 
     log(
-        f"Files indexed: {stats.num_files_indexed} "
-        f"(out of {stats.num_files_changed} changed files)"
+        "Files indexed: {} (out of {} changed files)",
+        stats.num_files_indexed,
+        stats.num_files_changed,
     )
-    log(f"Files removed from index: {stats.num_files_deleted}")
-    log(f"Symbols indexed: {stats.num_symbols_indexed}")
+    log("Files removed from index: {}", stats.num_files_deleted)
+    log("Symbols indexed: {}", stats.num_symbols_indexed)
+
+    if stats.exclusion_stats:
+        log("Exclusion pattern stats:")
+        for ex, count in stats.exclusion_stats.items():
+            log("  {!r}: {}", ex.pattern, count)
 
 
 class SearchOutputFormatParamType(click.Choice):

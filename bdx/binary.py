@@ -506,11 +506,17 @@ class BinaryDirectory:
     use_compilation_database: bool = False
 
     _file_list: list[Path] = field(repr=False, default_factory=list)
+    _exclusion_stats: dict[Exclusion, int] = field(
+        repr=False, default_factory=dict
+    )
 
     class CompilationDatabaseNotFoundError(FileNotFoundError):
         """Could not find the compilation database."""
 
     def __post_init__(self):
+        for ex in self.exclusions:
+            self._exclusion_stats[ex] = 0
+
         self._file_list.extend(self._find_files())
 
     @cached_property
@@ -520,6 +526,11 @@ class BinaryDirectory:
         if compdb is not None:
             info("Found compilation database: {}", compdb)
         return compdb
+
+    @property
+    def exclusion_stats(self) -> dict[Exclusion, int]:
+        """Mapping of ``Exclusion`` to match count."""
+        return dict(self._exclusion_stats)
 
     def changed_files(self) -> Iterator[Path]:
         """Yield files that were changed/created since last run."""
@@ -575,6 +586,7 @@ class BinaryDirectory:
                     file,
                     exclusion.pattern,
                 )
+                self._exclusion_stats[exclusion] += 1
                 continue
 
             if is_readable_elf_file(file):
