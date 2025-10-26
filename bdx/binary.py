@@ -481,7 +481,7 @@ class Definition:
     """Contains the location where a Symbol is defined."""
 
     source: Path
-    line: int
+    line: Optional[int] = None
 
 
 def find_symbol_definition(symbol: Symbol) -> Optional[Definition]:
@@ -489,38 +489,65 @@ def find_symbol_definition(symbol: Symbol) -> Optional[Definition]:
 
     This uses the addr2line program to find it.
     """
+    if symbol.source:
+        fallback = Definition(symbol.source)
+    else:
+        fallback = None
+
     try:
-        out = subprocess.check_output(
-            [
-                "addr2line",
-                "-i",
-                "-f",
-                "-j",
-                symbol.section,
-                "-e",
-                symbol.path,
-                hex(symbol.address),
-            ]
-        ).decode()
+        cmd = [
+            "addr2line",
+            "-i",
+            "-f",
+            "-j",
+            symbol.section,
+            "-e",
+            str(symbol.path),
+            hex(symbol.address),
+        ]
+
+        trace("Running command: {!r}", " ".join(cmd))
+        out = subprocess.check_output(cmd).decode()
     except Exception as e:
         debug("Failed to run addr2line program on {}:", symbol.name, str(e))
-        return None
+        return fallback
 
     lines = out.splitlines()
+    if len(lines) < 2:
+        trace("addr2line produced no output")
+        return fallback
+
+    pos = None
+
     try:
         pos = lines.index(symbol.name)
     except ValueError:
         trace("Symbol not found in addr2line output: {}", symbol)
-        return None
+
+    if pos is None and symbol.source:
+        for i, line in enumerate(lines):
+            if ":" not in line:
+                continue
+            filename, *_ = line.split(":")
+            path = Path(filename).resolve().absolute()
+            if path == symbol.source:
+                pos = i - 1
+                break
+
+    if pos is None:
+        pos = 0
 
     value = lines[pos + 1]
 
     match = re.match("(.*):([0-9]+)(.*discriminator.*)?$", value)
     if not match:
         debug("Unexpected output of addr2line detected")
-        return None
+        return fallback
 
     file, line, _ = match.groups()
+
+    if file == "??":
+        return fallback
 
     return Definition(Path(file), int(line))
 

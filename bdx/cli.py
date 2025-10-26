@@ -699,7 +699,7 @@ def find_definition(_directory, index_path, query, num):
             click.echo(
                 fmt.format(
                     file=defn.source,
-                    line=defn.line,
+                    line=defn.line if defn.line is not None else 0,
                     name=res.symbol.name,
                 )
             )
