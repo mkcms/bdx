@@ -477,6 +477,55 @@ def is_readable_elf_file(path: Path) -> bool:
 
 
 @dataclass(frozen=True)
+class Definition:
+    """Contains the location where a Symbol is defined."""
+
+    source: Path
+    line: int
+
+
+def find_symbol_definition(symbol: Symbol) -> Optional[Definition]:
+    """Attempt to find the definition of `symbol`.
+
+    This uses the addr2line program to find it.
+    """
+    try:
+        out = subprocess.check_output(
+            [
+                "addr2line",
+                "-i",
+                "-f",
+                "-j",
+                symbol.section,
+                "-e",
+                symbol.path,
+                hex(symbol.address),
+            ]
+        ).decode()
+    except Exception as e:
+        debug("Failed to run addr2line program on {}:", symbol.name, str(e))
+        return None
+
+    lines = out.splitlines()
+    try:
+        pos = lines.index(symbol.name)
+    except ValueError:
+        trace("Symbol not found in addr2line output: {}", symbol)
+        return None
+
+    value = lines[pos + 1]
+
+    match = re.match("(.*):([0-9]+)(.*discriminator.*)?$", value)
+    if not match:
+        debug("Unexpected output of addr2line detected")
+        return None
+
+    file, line, _ = match.groups()
+
+    return Definition(Path(file), int(line))
+
+
+@dataclass(frozen=True)
 class Exclusion:
     """Represents a glob pattern for excluding files to index."""
 

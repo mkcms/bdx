@@ -16,7 +16,12 @@ from click.types import BoolParamType, IntRange
 
 import bdx
 from bdx import debug, error, info, log, make_progress_bar, trace
-from bdx.binary import BinaryDirectory, Exclusion, find_compilation_database
+from bdx.binary import (
+    BinaryDirectory,
+    Exclusion,
+    find_compilation_database,
+    find_symbol_definition,
+)
 from bdx.index import (
     IndexingOptions,
     PathField,
@@ -650,6 +655,54 @@ def disass(
         trace("Symbol: {}", res)
         debug("Running command: {}", cmd)
         subprocess.check_call(cmd, shell=True)
+
+
+@cli.command()
+@_common_options(index_must_exist=True)
+@click.argument(
+    "query",
+    nargs=-1,
+    shell_complete=_complete_query,
+)
+@click.option(
+    "-n",
+    "--num",
+    help="Limit the number of results",
+    type=click.IntRange(1),
+    metavar="LIMIT",
+    default=None,
+)
+def find_definition(_directory, index_path, query, num):
+    """Find definition of symbols matching some query."""
+    fmt = "{file}:{line}: {name}"
+
+    results = search_index(
+        index_path=index_path, query=" ".join(query), limit=num
+    )
+
+    while True:
+        try:
+            res = next(results)
+        except QueryParser.Error as e:
+            error(f"Invalid query: {str(e)}")
+            exit(1)
+        except StopIteration:
+            break
+
+        if res.symbol_outdated:
+            error("Information outdated, re-index needed")
+
+        defn = find_symbol_definition(res.symbol)
+        debug("Found definition: {}", defn)
+
+        if defn:
+            click.echo(
+                fmt.format(
+                    file=defn.source,
+                    line=defn.line,
+                    name=res.symbol.name,
+                )
+            )
 
 
 @cli.command()

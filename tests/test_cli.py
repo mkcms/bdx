@@ -214,6 +214,21 @@ def test_cli_disassemble(monkeypatch, fixture_path, index_path):
     assert re.search("push[ ]+%rbp", output)
 
 
+def test_cli_find_definition(monkeypatch, fixture_path, index_path):
+    runner = CliRunner()
+    result = index_directory(runner, fixture_path, index_path)
+    assert result.exit_code == 0
+
+    result = runner.invoke(
+        cli,
+        ["find-definition", "--index-path", str(index_path), "fullname:main"],
+    )
+
+    assert result.exit_code == 0
+
+    assert result.stdout.strip() == f"/src/tests/fixture/toplev.c:7: main"
+
+
 def test_cli_file_list(fixture_path, index_path):
     runner = CliRunner()
     result = index_directory(runner, fixture_path, index_path)
