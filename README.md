@@ -176,39 +176,43 @@ $ bdx search -n 5 -f '0x{address:0>10x}|{section:<10}|{type:8}|{demangled}' tree
 
         bdx search type:FUNC OR type:OBJECT
 
-5. Search for symbols `foo*` in binary files named `bar.o`:
+5. Search for symbols in binary files with specific architecture:
+
+        bdx search arch:EM_X86_64
+
+6. Search for symbols `foo*` in binary files named `bar.o`:
 
         bdx search 'name:foo*' path:bar.o
 
-6. Search for symbols in files compiled from source file named `file.c`:
+7. Search for symbols in files compiled from source file named `file.c`:
 
         bdx search source:file.c
 
-7. Search for symbols `foo` or `bar` that are not mangled (`_Z*` prefix):
+8. Search for symbols `foo` or `bar` that are not mangled (`_Z*` prefix):
 
         bdx search '(foo OR bar)' AND NOT name:_Z*
 
-8. Search for symbols that reference/call `memset`:
+9. Search for symbols that reference/call `memset`:
 
         bdx search relocations:memset
 
-9. Search for symbols that call `malloc`, but not `free`:
+10. Search for symbols that call `malloc`, but not `free`:
 
         bdx search relocations:malloc NOT relocations:free
 
-10. Search for symbols with size in some range, where address is at least 0xfff0:
+11. Search for symbols with size in some range, where address is at least 0xfff0:
 
         bdx search foo size:100..200 address:0xfff0..
 
-11. Search for symbols by relative path of the binary:
+12. Search for symbols by relative path of the binary:
 
         bdx search 'path:./build/module/*'
 
-12. Search for string literals:
+13. Search for string literals:
 
         bdx search 'path:"/path/to/File With Spaces.o"'
 
-13. Search for big symbols in some section:
+14. Search for big symbols in some section:
 
         bdx search section:.rodata AND size:1000..
 

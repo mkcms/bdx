@@ -418,6 +418,17 @@ class Schema(Mapping):
             if db_field.name in self._field_dict:
                 msg = f"'{db_field.name}' is duplicated in the schema"
                 raise ValueError(msg)
+            other_fields = [x for x in self.fields if x is not db_field]
+            for other_field in other_fields:
+                if other_field.prefix.startswith(db_field.prefix):
+                    msg = (
+                        f"Field '{db_field.name}' has a collision "
+                        f"in prefix ({db_field.prefix!r})"
+                        f" with the field '{other_field.name}'"
+                        f"({other_field.prefix!r}) "
+                    )
+                    raise ValueError(msg)
+
             self._field_dict[db_field.name] = db_field
             if isinstance(db_field.key, str):
                 self._handlers[db_field.key].append(db_field)
@@ -469,6 +480,7 @@ class SymbolIndex:
 
     SCHEMA = Schema(
         [
+            DatabaseField("arch", "XARCH", key="arch"),
             PathField("path", "XP", key="path"),
             optional_field(PathField("source", "XSRC", key="source")),
             SymbolNameField("name", "XN", key="name"),
@@ -483,7 +495,7 @@ class SymbolIndex:
                 DatabaseField("fullname", "XFN", key=["name", "demangled"])
             ),
             DatabaseField("section", "XSN", key="section"),
-            IntegerField("address", "XA", slot=0, key="address"),
+            IntegerField("address", "XAD", slot=0, key="address"),
             IntegerField("size", "XSZ", slot=1, key="size"),
             EnumField("type", "XT", key="type", enum=SymbolType),
             RelocationsField("relocations", "XR", key="relocations"),
@@ -963,6 +975,7 @@ def _index_single_file(
         # Add a single document if there are no symbols.  Otherwise,
         # we would always treat it as unindexed.
         symbol = Symbol(
+            arch="EM_NONE",
             path=file,
             source=None,
             name="",

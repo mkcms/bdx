@@ -121,6 +121,7 @@ def test_cli_search_json_output(fixture_path, index_path):
         },
         "index": 1,
         "total": 2,
+        "arch": "EM_X86_64",
         "path": str(fixture_path / "subdir" / "foo.c.o"),
         "name": "c_function",
         "demangled": None,
@@ -137,6 +138,7 @@ def test_cli_search_json_output(fixture_path, index_path):
         },
         "index": 0,
         "total": 2,
+        "arch": "EM_X86_64",
         "path": str(fixture_path / "subdir" / "bar.cpp.o"),
         "name": "_Z12cxx_functionSt6vectorIiSaIiEE",
         "demangled": "cxx_function(std::vector<int, std::allocator<int> >)",
@@ -169,6 +171,7 @@ def test_cli_search_sexp_output(fixture_path, index_path):
         "(:outdated (:binary nil :symbol nil)"
         " :index 0"
         " :total 2"
+        ' :arch "EM_X86_64"'
         ' :path "XXX/subdir/bar.cpp.o"'
         " :source XXX"
         ' :name "_Z12cxx_functionSt6vectorIiSaIiEE"'

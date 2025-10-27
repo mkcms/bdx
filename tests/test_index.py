@@ -49,6 +49,7 @@ def test_indexing(fixture_path, tmp_path):
         uses_foo = by_name["uses_foo"]
         global_integer = by_name["_ZL14global_integer"]
 
+        assert top_level_symbol.arch == "EM_X86_64"
         assert top_level_symbol.path == fixture_path / "toplev.c.o"
         assert top_level_symbol.name == "top_level_symbol"
         assert top_level_symbol.demangled is None
@@ -59,6 +60,7 @@ def test_indexing(fixture_path, tmp_path):
         assert top_level_symbol.relocations == []
         assert top_level_symbol.mtime > 0
 
+        assert other_top_level_symbol.arch == "EM_X86_64"
         assert other_top_level_symbol.path == fixture_path / "toplev.c.o"
         assert other_top_level_symbol.name == "other_top_level_symbol"
         assert other_top_level_symbol.demangled is None
@@ -69,12 +71,14 @@ def test_indexing(fixture_path, tmp_path):
         assert other_top_level_symbol.relocations == ["top_level_symbol"]
         assert other_top_level_symbol.mtime > 0
 
+        assert bar.arch == "EM_X86_64"
         assert bar.path == fixture_path / "subdir" / "bar.cpp.o"
         assert bar.name == "bar"
         assert bar.section == ".bss"
         assert bar.type == SymbolType.OBJECT
         assert bar.relocations == []
 
+        assert cxx_function.arch == "EM_X86_64"
         assert cxx_function.path == fixture_path / "subdir" / "bar.cpp.o"
         assert cxx_function.name == "_Z12cxx_functionSt6vectorIiSaIiEE"
         assert (
@@ -88,12 +92,14 @@ def test_indexing(fixture_path, tmp_path):
             "foo",
         ]
 
+        assert foo.arch == "EM_X86_64"
         assert foo.path == fixture_path / "subdir" / "foo.c.o"
         assert foo.name == "foo"
         assert foo.section == ".bss"
         assert foo.type == SymbolType.OBJECT
         assert foo.relocations == []
 
+        assert c_function.arch == "EM_X86_64"
         assert c_function.path == fixture_path / "subdir" / "foo.c.o"
         assert c_function.name == "c_function"
         assert c_function.section == ".text"
@@ -104,12 +110,14 @@ def test_indexing(fixture_path, tmp_path):
 
         for i in range(5):
             symbol = by_name[f"a_name{i}"]
+            assert symbol.arch == "EM_X86_64"
             assert symbol.path == fixture_path / "subdir" / "foo.c.o"
             assert symbol.name == f"a_name{i}"
             assert symbol.section == ".bss"
             assert symbol.type == SymbolType.OBJECT
             assert symbol.relocations == []
 
+        assert camel_case_symbol.arch == "EM_X86_64"
         assert camel_case_symbol.path == fixture_path / "subdir" / "foo.c.o"
         assert camel_case_symbol.name == "CamelCaseSymbol"
         assert camel_case_symbol.section == ".text"

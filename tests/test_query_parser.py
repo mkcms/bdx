@@ -256,7 +256,7 @@ def test_intrange(query_parser):
 
     query_parser.schema = Schema(
         [
-            IntegerField("value", "XV", slot=slot, key="value"),
+            IntegerField("value", "XV1", slot=slot, key="value"),
             IntegerField(
                 "other_value", "XV2", slot=slot + 1, key="other_value"
             ),

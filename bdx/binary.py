@@ -155,6 +155,7 @@ class SymbolType(Enum):
 class Symbol:
     """Represents a symbol in a binary file."""
 
+    arch: str
     path: Path
     source: Optional[Path]
     name: str
@@ -320,6 +321,8 @@ def _read_symbols_in_file(
         msg = ".symtab is not a SymbolTableSection"
         raise RuntimeError(msg)
 
+    arch = elf.header.e_machine
+
     mtime = os.stat(elf.stream.fileno()).st_mtime_ns
     source = _find_source_file(
         elf,
@@ -344,6 +347,7 @@ def _read_symbols_in_file(
 
         symbols.append(
             Symbol(
+                arch=arch,
                 path=Path(file),
                 source=source,
                 name=symbol.name,
