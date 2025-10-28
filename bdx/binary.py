@@ -553,7 +553,7 @@ def find_symbol_definition(symbol: Symbol) -> Optional[Definition]:
     if file == "??":
         return fallback
 
-    return Definition(Path(file), int(line))
+    return Definition(Path(file).resolve(), int(line))
 
 
 @dataclass(frozen=True)
