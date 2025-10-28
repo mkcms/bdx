@@ -153,6 +153,19 @@ $ bdx search -n 5 -f '0x{address:0>10x}|{section:<10}|{type:8}|{demangled}' tree
 0x000000069c|.text     |FUNC    |lhd_tree_dump_dump_tree(void*, tree_node*)
 ```
 
+### Find definition ###
+
+`bdx find-definition` command accepts a query string and attempts to find
+source locations where the symbols matching the query are defined:
+
+```
+$ bdx find-definition -n 5 hash table
+/src/gcc-12/gcc/hash-table.h:909: _ZN10hash_tableI13saving_hasherLb0E11xcallocatorE14find_with_hashERKPvj
+/src/gcc-12/gcc/hash-table.h:676: _ZN10hash_tableI20action_record_hasherLb0E11xcallocatorED2Ev
+/src/gcc-12/gcc/hash-table.h:676: _ZN10hash_tableI19external_ref_hasherLb0E11xcallocatorED2Ev
+/src/gcc-12/gcc/hash-table.h:676: _ZN10hash_tableI15variable_hasherLb0E11xcallocatorED2Ev
+/src/gcc-12/gcc/hash-table.h:676: _ZN10hash_tableI20action_record_hasherLb0E11xcallocatorED1Ev
+```
 
 #### Examples ####
 
