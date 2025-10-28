@@ -709,21 +709,20 @@ class SymbolIndex:
         db = self._live_db()
         field_data = self.schema["mtime"]
         slot = field_data.slot  # pyright: ignore
-        val = db.get_value_upper_bound(slot)
-        if not val:
-            return 0
 
-        # Search for symbol which has the known highest mtime.  We
-        # can't just use Xapian.sortable_unserialise() on ``val``, as
-        # that converts the value to a float, and we lose precision,
-        # causing errors and unexpected results, e.g. files won't be
-        # treated as modified even though they were.
+        # Search for symbol which has the known highest mtime.
+        enquire = xapian.Enquire(db)
+        enquire.set_query(xapian.Query.MatchAll)  # pyright: ignore
+        enquire.set_sort_by_value(slot, True)
 
-        query = xapian.Query(xapian.Query.OP_VALUE_RANGE, slot, val, val)
-        results = self.search(query, limit=1)
-        if results.count == 0:
-            return 0
-        return list(results)[0].mtime
+        try:
+            mset = enquire.get_mset(0, 1)
+            if mset.size() > 0:
+                return list(self.MatchResults(mset.size(), mset))[0].mtime
+            else:
+                return 0
+        except xapian.DatabaseModifiedError as e:
+            raise SymbolIndex.ModifiedError from e
 
     def binary_dir(self) -> Optional[Path]:
         """Get binary directory of this index, set by ``set_binary_dir``."""
