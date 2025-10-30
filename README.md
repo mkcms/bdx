@@ -191,7 +191,7 @@ $ bdx find-definition -n 5 hash table
 
 5. Search for symbols in binary files with specific architecture:
 
-        bdx search arch:EM_X86_64
+        bdx search arch:X86_64
 
 6. Search for symbols `foo*` in binary files named `bar.o`:
 

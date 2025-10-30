@@ -33,6 +33,7 @@ import xapian
 
 from bdx import debug, detail_log, error, log, make_progress_bar, trace
 from bdx.binary import (
+    Arch,
     BinaryDirectory,
     Exclusion,
     Symbol,
@@ -508,7 +509,7 @@ class SymbolIndex:
 
     SCHEMA = Schema(
         [
-            DatabaseField("arch", "XARCH", key="arch"),
+            EnumField("arch", "XARCH", key="arch", enum=Arch),
             PathField("path", "XP", key="path"),
             optional_field(PathField("source", "XSRC", key="source")),
             SymbolNameField("name", "XN", key="name"),
@@ -1005,7 +1006,7 @@ def _index_single_file(
         # Add a single document if there are no symbols.  Otherwise,
         # we would always treat it as unindexed.
         symbol = Symbol(
-            arch="EM_NONE",
+            arch=Arch.NONE,  # type: ignore
             path=file,
             source=None,
             name="",

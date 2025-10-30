@@ -17,6 +17,7 @@ from typing import ClassVar, Collection, Iterable, Iterator, Optional
 
 import wcmatch.glob as glob
 from elftools.elf.elffile import ELFFile
+from elftools.elf.enums import ENUM_E_MACHINE
 from elftools.elf.relocation import Relocation, RelocationSection
 from elftools.elf.sections import Symbol as ELFSymbol
 from elftools.elf.sections import SymbolTableSection
@@ -150,12 +151,29 @@ class SymbolType(Enum):
             return SymbolType.NOTYPE
 
 
+_machines = {
+    k.replace("EM_", "", 1): v
+    for k, v in ENUM_E_MACHINE.items()
+    if k.startswith("EM_")
+}
+_machines["NONE"] = 0
+Arch = Enum("Arch", _machines)  # type: ignore
+
+
+def _get_arch(elf: ELFFile) -> Arch:
+    e_machine = elf.header.e_machine.replace("EM_", "", 1)
+    try:
+        return Arch[e_machine]
+    except KeyError:
+        return Arch.NONE  # type: ignore
+
+
 @total_ordering
 @dataclass(frozen=True, order=False)
 class Symbol:
     """Represents a symbol in a binary file."""
 
-    arch: str
+    arch: Arch
     path: Path
     source: Optional[Path]
     name: str
@@ -321,7 +339,7 @@ def _read_symbols_in_file(
         msg = ".symtab is not a SymbolTableSection"
         raise RuntimeError(msg)
 
-    arch = elf.header.e_machine
+    arch = _get_arch(elf)
 
     mtime = os.stat(elf.stream.fileno()).st_mtime_ns
     source = _find_source_file(
