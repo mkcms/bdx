@@ -8,7 +8,13 @@ from typing import Callable, Iterator, Optional
 import xapian
 
 from bdx import debug, trace
-from bdx.index import PathField, Schema, SymbolIndex, _OptionalField
+from bdx.index import (
+    DatabaseField,
+    PathField,
+    Schema,
+    SymbolIndex,
+    _OptionalField,
+)
 
 
 def _make_regex_matcher(
@@ -205,6 +211,22 @@ class QueryParser:
         return [prefix + i for i in results]
 
     def complete_query(self, index: SymbolIndex, query: str) -> Iterator[str]:
+        """Complete the given query in index."""
+        seen = set()
+
+        for comp in self._complete_query(index, query):
+            if comp.startswith(DatabaseField.HASHED_TERM_MAGIC):
+                # Ignore special terms that are for trimmed terms
+                # that were too long
+                continue
+
+            if comp in seen:
+                continue
+
+            seen.add(comp)
+            yield comp
+
+    def _complete_query(self, index: SymbolIndex, query: str) -> Iterator[str]:
         """Complete the given query in index."""
         self._query = query
         self._token = None
@@ -472,7 +494,12 @@ class QueryParser:
         subqueries = []
         for field in self.default_fields:
             subquery = self.schema[field].make_query(
-                value, wildcard=wildcard or self.auto_wildcard
+                value,
+                wildcard=wildcard
+                or (
+                    self.auto_wildcard
+                    and not self.schema[field].is_term_too_long(value)
+                ),
             )
             subqueries.append(subquery)
 

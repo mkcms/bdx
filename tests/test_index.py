@@ -31,7 +31,7 @@ def test_indexing(fixture_path, tmp_path):
 
     with SymbolIndex.open(index_path, readonly=True) as index:
         symbols = index.search("*:*")
-        assert symbols.count == 19
+        assert symbols.count == 20
         by_name = {x.name: x for x in symbols}
 
         top_level_symbol = by_name["top_level_symbol"]
@@ -48,6 +48,7 @@ def test_indexing(fixture_path, tmp_path):
         foo__ = by_name["foo__"]
         uses_foo = by_name["uses_foo"]
         global_integer = by_name["_ZL14global_integer"]
+        long_name = by_name["name_has_256_chars_" + "0" * 237]
 
         assert top_level_symbol.arch == "EM_X86_64"
         assert top_level_symbol.path == fixture_path / "toplev.c.o"
@@ -163,6 +164,10 @@ def test_indexing(fixture_path, tmp_path):
         assert global_integer.section == ".bss"
         assert global_integer.type == SymbolType.OBJECT
         assert global_integer.size == 4
+
+        assert long_name.path == fixture_path / "toplev.c.o"
+        assert long_name.section == ".bss"
+        assert long_name.type == SymbolType.OBJECT
 
 
 def test_reindexing(fixture_path, tmp_path):
@@ -672,8 +677,31 @@ def test_searching_by_basename(fixture_path, readonly_index):
 
 
 def test_searching_long_name(fixture_path, readonly_index):
+    name = "name_has_256_chars_" + "0" * 237
+    res = readonly_index.search(name)
+
+    assert res.count == 1
+    symbol = list(res)[0]
+    assert symbol.name == name
+    assert symbol.path == fixture_path / "toplev.c.o"
+
+    name = "name_has_256_chars_" + "0" * 236  # 1 char shorter
+    res = readonly_index.search(name)
+    assert res.count == 0
+
+    name = "name_has_256_chars_" + "0" * 236 + "1"
+    res = readonly_index.search(name)
+    assert res.count == 0
+
     with pytest.raises(QueryParser.Error, match="'name'.*too long"):
-        readonly_index.search("a" * 300)
+        readonly_index.search(f"{name}*")
+
+    preflen = len(readonly_index.SCHEMA["name"].prefix)
+    res = readonly_index.search(f"name:{name[:MAX_TERM_SIZE-preflen]}*")
+    assert res.count == 1
+
+    with pytest.raises(QueryParser.Error, match="'name'.*too long"):
+        readonly_index.search(f"name:{name[:MAX_TERM_SIZE-preflen+1]}*")
 
 
 def test_searching_cxx(readonly_index):

@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from functools import cache
+from hashlib import sha1
 from pathlib import Path
 from queue import Empty as QueueEmpty
 from queue import Queue
@@ -67,23 +68,44 @@ class DatabaseField:
     # the index.
     key: Union[str, list[str]]
 
+    HASHED_TERM_MAGIC = "__bdx_hashed_term"
+
     def index(self, document: xapian.Document, value: Any):
         """Index ``value`` in the ``document``."""
         value = self.preprocess_value(value)
-        prefix = self.prefix.encode()
 
-        term = prefix + value
-        term = term[:MAX_TERM_SIZE]
+        term = self.prefix.encode() + value
+        trimmed_term = term[:MAX_TERM_SIZE]
+        document.add_term(trimmed_term)
 
-        document.add_term(term)
+        if self.is_term_too_long(value):
+            # There are limits to term lengths, so save long terms as
+            # PREFIX + HASH(TERM).  That way we can still search them
+            # (with possibility of collision, and with no wildcard
+            # support).
+            hashed_long_term = sha1(value).hexdigest()
+            trimmed_long_term = "".join(
+                [self.prefix, self.HASHED_TERM_MAGIC, hashed_long_term]
+            ).encode()
 
-    def preprocess_value(self, value: Any) -> bytes:
-        """Preprocess the value before indexing it."""
+            document.add_term(trimmed_long_term)
+
+    def _coerce_into_bytes(self, value: Any) -> bytes:
+        """Encode ``value`` as bytes."""
         if not isinstance(value, (str, bytes)):
             value = str(value)
         if isinstance(value, str):
             value = value.encode()
         return value
+
+    def preprocess_value(self, value: Any) -> bytes:
+        """Preprocess the value before indexing it."""
+        return self._coerce_into_bytes(value)
+
+    def is_term_too_long(self, term: str | bytes) -> bool:
+        """Check if ``term`` is too long."""
+        term = self._coerce_into_bytes(term)
+        return len(self.prefix) + len(term) > MAX_TERM_SIZE
 
     def make_query(self, value: str, wildcard: bool = False) -> xapian.Query:
         """Make a query for the given value.
@@ -95,12 +117,18 @@ class DatabaseField:
         """
         value = self.preprocess_value(value).decode()
         term = f"{self.prefix}{value}"
-        if len(term) > MAX_TERM_SIZE:
-            msg = (
-                f"Term for '{self.name}' field is too long, max size "
-                f"is {MAX_TERM_SIZE-len(self.prefix)}: '{value[:30]}'..."
-            )
-            raise ValueError(msg)
+        if self.is_term_too_long(value):
+            if wildcard:
+                msg = (
+                    f"Term for '{self.name}' field is too long, max size "
+                    f"is {MAX_TERM_SIZE-len(self.prefix)}: '{value[:30]}'..."
+                )
+                raise ValueError(msg)
+            else:
+                hashed_long_term = sha1(value.encode()).hexdigest()
+                term = (
+                    f"{self.prefix}{self.HASHED_TERM_MAGIC}{hashed_long_term}"
+                )
 
         if wildcard:
             return xapian.Query(
@@ -831,7 +859,10 @@ class SymbolIndex:
 
         for term in all_terms:
             value = term.term[len(field_data.prefix) :]
-            yield value.decode()
+            decoded = value.decode()
+            if decoded.startswith(DatabaseField.HASHED_TERM_MAGIC):
+                continue
+            yield decoded
 
     def search(
         self,

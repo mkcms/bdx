@@ -6,7 +6,14 @@ import pytest
 import xapian
 from pytest import fixture
 
-from bdx.index import DatabaseField, EnumField, IntegerField, PathField, Schema
+from bdx.index import (
+    MAX_TERM_SIZE,
+    DatabaseField,
+    EnumField,
+    IntegerField,
+    PathField,
+    Schema,
+)
 from bdx.query_parser import QueryParser
 
 AND = xapian.Query.OP_AND
@@ -722,7 +729,13 @@ def test_complete_all_quoted_terms(readonly_index):
     terms = set(readonly_index.iter_prefix("name", ""))
     terms.update(set(readonly_index.iter_prefix("demangled", "")))
     terms.update(set(readonly_index.iter_prefix("fullname", "")))
-    assert completions == set(f'prefix "{term}"' for term in terms)
+
+    completions = set(x for x in completions if "name_has_256_chars" not in x)
+    terms = set(x for x in terms if "name_has_256_chars" not in x)
+
+    terms_with_prefix = set(f'prefix "{term}"' for term in terms)
+
+    assert completions == terms_with_prefix
 
 
 def test_complete_all_quoted_terms_with_prefix(readonly_index):
