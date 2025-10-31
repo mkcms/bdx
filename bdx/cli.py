@@ -17,7 +17,7 @@ from click.types import BoolParamType, IntRange
 import bdx
 from bdx import debug, error, info, log, make_progress_bar, trace
 from bdx.binary import (
-    BinaryDirectory,
+    CompilationDatabaseSource,
     Exclusion,
     find_compilation_database,
     find_symbol_definition,
@@ -302,6 +302,16 @@ def cli():
 
 @cli.command()
 @_common_options(index_must_exist=False)
+@click.option(
+    "-f",
+    "--file-list",
+    type=click.File("r", lazy=True),
+    default=None,
+    help=(
+        "If provided, read the list of files from this file."
+        "  If it's `-`, then read it from stdin."
+    ),
+)
 @click.option("-c", "--use-compilation-database", is_flag=True)
 @click.option(
     "-o",
@@ -356,6 +366,7 @@ def index(
     index_path,
     opt,
     use_compilation_database,
+    file_list,
     reindex,
     exclude,
     delete,
@@ -369,6 +380,20 @@ def index(
     if delete:
         delete_index(index_path, metadata_too=delete_metadata, dry_run=dry_run)
 
+    if file_list and use_compilation_database:
+        msg = (
+            "-f/--file-list is not allowed"
+            " with -c/--use-compilation-database"
+        )
+        raise click.BadArgumentUsage(msg)
+
+    files: Optional[list[Path]] = None
+    if file_list:
+        debug("Reading file list from: {}", file_list.name)
+        lines = file_list.readlines()
+        files = [Path(f.strip()) for f in lines]
+        debug("File list contains {} file(s)", len(files))
+
     exclusions = [Exclusion(ex) for ex in exclude]
 
     options = IndexingOptions(**dict(opt))
@@ -379,11 +404,12 @@ def index(
             index_path,
             options=options,
             exclusions=exclusions,
+            files=files,
             use_compilation_database=use_compilation_database,
             reindex=reindex,
             dry_run=dry_run,
         )
-    except BinaryDirectory.CompilationDatabaseNotFoundError as e:
+    except CompilationDatabaseSource.CompilationDatabaseNotFoundError as e:
         error(str(e))
         exit(1)
 

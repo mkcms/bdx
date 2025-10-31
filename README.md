@@ -58,6 +58,10 @@ Or you can specify the directory to index:
 
     bdx index -d ./build
 
+Alternatively you can specify list of files to index (here with bash process substitution):
+
+    bdx index  -f <(find . -name '*.o')
+
 The indexer will only index files changed since last run.  With `--exclude`
 option you can choose directories/glob patterns to ignore.
 

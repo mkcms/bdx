@@ -35,7 +35,11 @@ from bdx import debug, detail_log, error, log, make_progress_bar, trace
 from bdx.binary import (
     Arch,
     BinaryDirectory,
+    CompilationDatabaseSource,
     Exclusion,
+    FileSource,
+    GlobSource,
+    StaticFileSource,
     Symbol,
     SymbolType,
     read_symbols_in_file,
@@ -1181,6 +1185,7 @@ def index_binary_directory(
     directory: str | Path,
     index_path: Path,
     options: IndexingOptions,
+    files: Optional[list[Path]] = None,
     use_compilation_database: bool = False,
     reindex: bool = False,
     exclusions: Optional[Collection[Exclusion]] = None,
@@ -1222,12 +1227,23 @@ def index_binary_directory(
         else:
             mtime_ns = index.mtime()
         existing_files = set(index.all_files())
+
+        source: Optional[FileSource] = None
+        if use_compilation_database:
+            source = CompilationDatabaseSource(bindir_path)
+        elif files is not None:
+            source = StaticFileSource(files)
+        else:
+            source = GlobSource(bindir_path)
+
+        assert source is not None
+
         bdir = BinaryDirectory(
             path=bindir_path,
+            source=source,
             exclusions=exclusions,
             last_mtime_ns=mtime_ns,
             previous_file_list=list(existing_files),
-            use_compilation_database=use_compilation_database,
         )
 
         changed_files = list(bdir.changed_files())

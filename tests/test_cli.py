@@ -38,6 +38,26 @@ def index_directory_compile_commands(
     return runner.invoke(cli, ["index", "--index-path", str(index_path), "-c"])
 
 
+def index_directory_with_file_list(
+    runner: CliRunner,
+    index_path: Path,
+    tmp_path: Path,
+    file_list: list[Path],
+) -> Result:
+    tmpfile = tmp_path / "files.txt"
+    tmpfile.write_text("\n".join(map(str, file_list)))
+    return runner.invoke(
+        cli,
+        [
+            "index",
+            "--index-path",
+            str(index_path),
+            "-f",
+            str(tmpfile),
+        ],
+    )
+
+
 def search_directory(runner: CliRunner, index_path: Path, *args) -> Result:
     return runner.invoke(
         cli, ["search", "--index-path", str(index_path), *args]
@@ -90,6 +110,42 @@ def test_cli_indexing_with_compile_commands(fixture_path, index_path, chdir):
             f"foo.c.o: .text: c_function: {fixture_path}/subdir/foo.c" in lines
         )
         assert f"bar.cpp.o: .bss: bar: {fixture_path}/subdir/bar.cpp" in lines
+
+
+def test_cli_indexing_with_custom_file_list(
+    tmp_path, fixture_path, index_path, chdir
+):
+    with chdir(fixture_path):
+        runner = CliRunner()
+
+        result = index_directory_with_file_list(
+            runner,
+            index_path,
+            tmp_path,
+            [
+                Path() / "subdir" / "foo.c.o",
+                Path() / "toplev.c.o",
+            ],
+        )
+        assert result.exit_code == 0
+
+        searchresult = search_directory(
+            runner,
+            index_path,
+            "-f",
+            "{basename}: {section}: {name}: {source}",
+            "*:*",
+        )
+        assert searchresult.exit_code == 0
+
+        lines = searchresult.output.splitlines()
+
+        assert (
+            f"foo.c.o: .text: c_function: /src/subdir/foo.c"
+            in lines
+        )
+        assert not any([x.startswith("bar.cpp.o: ") for x in lines])
+        assert any([x.startswith("toplev.c.o: ") for x in lines])
 
 
 def test_cli_search_json_output(fixture_path, index_path):

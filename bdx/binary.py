@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+from abc import abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from datetime import datetime
@@ -593,29 +594,52 @@ class Exclusion:
         )
 
 
-@dataclass(frozen=True)
-class BinaryDirectory:
-    """Represents a directory containing zero or more binary files."""
+class FileSource:
+    """Provides a list of files to index."""
 
-    path: Path
-    exclusions: Collection[Exclusion] = field(default_factory=list)
-    last_mtime_ns: int = 0
-    previous_file_list: list[Path] = field(repr=False, default_factory=list)
-    use_compilation_database: bool = False
+    def __init__(self, path: Optional[Path] = None):
+        """Initialize this FileSource for finding files under ``path``."""
+        self.path = path or Path()
 
-    _file_list: list[Path] = field(repr=False, default_factory=list)
-    _exclusion_stats: dict[Exclusion, int] = field(
-        repr=False, default_factory=dict
-    )
+    @abstractmethod
+    def find_files(self) -> Iterable[Path]:
+        """Return a list of files to index."""
+        pass
+
+
+class StaticFileSource(FileSource):
+    """Provides a list of files to index."""
+
+    def __init__(self, file_list: list[Path]):
+        """Initialize this StaticFileSource with a list of files."""
+        self.files = file_list
+
+    def find_files(self) -> Iterable[Path]:
+        """Return a list of files to index."""
+        return list(self.files)
+
+
+class GlobSource(FileSource):
+    """Provides a list of files by searching for globs."""
+
+    def find_files(self) -> Iterable[Path]:
+        """Return a list of files to index."""
+        files = self.path.rglob("*.o")
+        files = make_progress_bar(
+            files,
+            desc="Gathering files by glob",
+            unit="files",
+            leave=False,
+        )
+
+        return files
+
+
+class CompilationDatabaseSource(FileSource):
+    """Provides a list of files to index from a compilation database."""
 
     class CompilationDatabaseNotFoundError(FileNotFoundError):
         """Could not find the compilation database."""
-
-    def __post_init__(self):
-        for ex in self.exclusions:
-            self._exclusion_stats[ex] = 0
-
-        self._file_list.extend(self._find_files())
 
     @cached_property
     def compilation_database(self):
@@ -624,6 +648,44 @@ class BinaryDirectory:
         if compdb is not None:
             info("Found compilation database: {}", compdb)
         return compdb
+
+    def find_files(self) -> Iterable[Path]:
+        """Return a list of files to index."""
+        path = self.compilation_database
+        if not path:
+            msg = (
+                f"compile_commands.json file not found in {self.path} "
+                "or any of the parent directories"
+            )
+            raise self.CompilationDatabaseNotFoundError(msg)
+
+        compdb = _read_compdb(path, path.stat().st_mtime_ns)
+
+        return compdb.get_all_binary_files()
+
+
+@dataclass(frozen=True)
+class BinaryDirectory:
+    """Represents a directory containing zero or more binary files."""
+
+    path: Path
+    source: FileSource = field(default_factory=GlobSource)
+    exclusions: Collection[Exclusion] = field(default_factory=list)
+    last_mtime_ns: int = 0
+    previous_file_list: list[Path] = field(repr=False, default_factory=list)
+
+    _file_list: list[Path] = field(repr=False, default_factory=list)
+    _exclusion_stats: dict[Exclusion, int] = field(
+        repr=False, default_factory=dict
+    )
+
+    def __post_init__(self):
+        for ex in self.exclusions:
+            self._exclusion_stats[ex] = 0
+
+        self.source.path = self.path
+
+        self._file_list.extend(self._find_files())
 
     @property
     def exclusion_stats(self) -> dict[Exclusion, int]:
@@ -665,16 +727,8 @@ class BinaryDirectory:
         yield from sorted(deleted)
 
     def _find_files(self) -> Iterator[Path]:
-        if self.use_compilation_database:
-            files = self._find_files_from_compilation_database()
-        else:
-            files = self.path.rglob("*.o")
-            files = make_progress_bar(
-                files,
-                desc="Gathering files by glob",
-                unit="files",
-                leave=False,
-            )
+        files = self.source.find_files()
+        files = [f.absolute() for f in files]
 
         for file in files:
             exclusion = self._find_exclusion(file)
@@ -691,19 +745,6 @@ class BinaryDirectory:
                 yield file
             else:
                 trace("{}: Ignoring, not a readable ELF file", file)
-
-    def _find_files_from_compilation_database(self) -> Iterable[Path]:
-        path = self.compilation_database
-        if not path:
-            msg = (
-                f"compile_commands.json file not found in {self.path} "
-                "or any of the parent directories"
-            )
-            raise BinaryDirectory.CompilationDatabaseNotFoundError(msg)
-
-        compdb = _read_compdb(path, path.stat().st_mtime_ns)
-
-        return compdb.get_all_binary_files()
 
     def _find_exclusion(self, path: Path) -> Optional[Exclusion]:
         for excl in self.exclusions:
