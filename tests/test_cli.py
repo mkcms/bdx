@@ -140,10 +140,7 @@ def test_cli_indexing_with_custom_file_list(
 
         lines = searchresult.output.splitlines()
 
-        assert (
-            f"foo.c.o: .text: c_function: /src/subdir/foo.c"
-            in lines
-        )
+        assert f"foo.c.o: .text: c_function: /src/subdir/foo.c" in lines
         assert not any([x.startswith("bar.cpp.o: ") for x in lines])
         assert any([x.startswith("toplev.c.o: ") for x in lines])
 
@@ -285,7 +282,7 @@ def test_cli_find_definition(monkeypatch, fixture_path, index_path):
 
     assert result.exit_code == 0
 
-    assert result.stdout.strip() == f"/src/tests/fixture/toplev.c:7: main"
+    assert result.stdout.strip() == f"/src/toplev.c:7: main"
 
 
 def test_cli_file_list(fixture_path, index_path):
