@@ -236,7 +236,7 @@ class CompilationDatabase:
                     found_in = "command"
             elif "arguments" in entry:
                 args = entry["arguments"]
-                for prev, next in zip(args, args[1:]):
+                for prev, next in zip(args, args[1:], strict=False):
                     if prev == "-o":
                         file = Path(next)
                         found_in = "arguments"

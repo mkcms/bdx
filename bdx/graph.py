@@ -332,7 +332,7 @@ def generate_graph(
 
             nodes.update(path)
 
-            for prev, next in zip(path, path[1:]):
+            for prev, next in zip(path, path[1:], strict=False):
                 graph.add_edge(
                     prev.name,
                     next.name,
