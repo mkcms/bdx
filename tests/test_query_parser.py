@@ -800,7 +800,7 @@ def test_complete_path(chdir, fixture_path, readonly_index):
 
     with chdir(fixture_path):
         assert set(
-            query_parser.complete_query(readonly_index, "path:./s")
+            query_parser.complete_query(readonly_index, "path:./su")
         ) == set(
             [
                 "path:./subdir/",
@@ -816,6 +816,8 @@ def test_complete_path(chdir, fixture_path, readonly_index):
                 "path:./../fixture/subdir/*",
                 "path:./../fixture/toplev.c",
                 "path:./../fixture/toplev.c.o",
+                "path:./../fixture/shared.c",
+                "path:./../fixture/shared.c.so",
             ]
         )
 

@@ -302,6 +302,7 @@ def test_cli_file_list(fixture_path, index_path):
             str(fixture_path / "subdir" / "bar.cpp.o"),
             str(fixture_path / "subdir" / "foo.c.o"),
             str(fixture_path / "toplev.c.o"),
+            str(fixture_path / "shared.c.so"),
         ]
     )
 
@@ -335,6 +336,8 @@ def test_cli_complete_query(chdir, fixture_path, index_path):
         assert completionsresult.exit_code == 0
         assert set(completionsresult.output.splitlines()) == set(
             [
+                "path:./shared.c",
+                "path:./shared.c.so",
                 "path:./subdir/",
                 "path:./subdir/*",
                 "path:./toplev.c",
@@ -349,6 +352,8 @@ def test_cli_complete_query(chdir, fixture_path, index_path):
         assert completionsresult.exit_code == 0
         assert set(completionsresult.output.splitlines()) == set(
             [
+                "path:./../shared.c",
+                "path:./../shared.c.so",
                 "path:./../subdir/",
                 "path:./../subdir/*",
                 "path:./../toplev.c",

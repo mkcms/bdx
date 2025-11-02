@@ -34,7 +34,7 @@ def test_indexing(fixture_path, tmp_path):
 
     with SymbolIndex.open(index_path, readonly=True) as index:
         symbols = index.search("*:*")
-        assert symbols.count == 20
+        assert symbols.count == 22
         by_name = {x.name: x for x in symbols}
 
         top_level_symbol = by_name["top_level_symbol"]
@@ -52,6 +52,8 @@ def test_indexing(fixture_path, tmp_path):
         uses_foo = by_name["uses_foo"]
         global_integer = by_name["_ZL14global_integer"]
         long_name = by_name["name_has_256_chars_" + "0" * 237]
+        shared_object = by_name["shared_object"]
+        completed = by_name["completed.0"]
 
         assert top_level_symbol.arch == X86_64
         assert top_level_symbol.path == fixture_path / "toplev.c.o"
@@ -171,6 +173,12 @@ def test_indexing(fixture_path, tmp_path):
         assert long_name.path == fixture_path / "toplev.c.o"
         assert long_name.section == ".bss"
         assert long_name.type == SymbolType.OBJECT
+
+        assert shared_object.path == fixture_path / "shared.c.so"
+        assert shared_object.section == ".data"
+        assert shared_object.type == SymbolType.OBJECT
+
+        assert completed.path == fixture_path / "shared.c.so"
 
 
 def test_reindexing(fixture_path, tmp_path):
@@ -325,7 +333,7 @@ def test_indexing_exclusions(fixture_path, tmp_path):
         fixture_path,
         index_path,
         IndexingOptions(),
-        exclusions=[Exclusion("**/*.c.o")],
+        exclusions=[Exclusion("**/*.c.o"), Exclusion("**/*.c.so")],
     )
     with SymbolIndex.open(index_path, readonly=True) as index:
         symbols = list(index.search("*:*"))

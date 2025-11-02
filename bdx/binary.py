@@ -332,12 +332,14 @@ def _read_symbols_in_file(
     use_compilation_database: bool,
     use_dwarfdump: bool,
 ) -> list[Symbol]:
-    symtab = elf.get_section_by_name(".symtab")
+    symtab = elf.get_section_by_name(".symtab") or elf.get_section_by_name(
+        ".dynsym"
+    )
     if symtab is None:
-        log("warning: {}: .symtab section does not exist", file, symtab)
+        log("warning: {}: .symtab and .dynsym sections not found", file)
         return []
     if not isinstance(symtab, SymbolTableSection):
-        msg = ".symtab is not a SymbolTableSection"
+        msg = f"{symtab.name} is not a SymbolTableSection"
         raise RuntimeError(msg)
 
     arch = _get_arch(elf)
@@ -624,15 +626,26 @@ class GlobSource(FileSource):
 
     def find_files(self) -> Iterable[Path]:
         """Return a list of files to index."""
-        files = self.path.rglob("*.o")
+        files = glob.iglob(
+            ["**/*.o", "**/*.so"],
+            root_dir=self.path,
+            limit=100000000000,
+            flags=glob.GLOBSTAR,
+        )
         files = make_progress_bar(
-            files,
+            map(self._make_absolute_path, files),
             desc="Gathering files by glob",
             unit="files",
             leave=False,
         )
 
         return files
+
+    def _make_absolute_path(self, path: str) -> Path:
+        p = Path(path)
+        if not p.is_absolute():
+            p = self.path / p
+        return p
 
 
 class CompilationDatabaseSource(FileSource):
