@@ -24,7 +24,7 @@ from elftools.elf.sections import Symbol as ELFSymbol
 from elftools.elf.sections import SymbolTableSection
 from sortedcontainers import SortedList
 
-from bdx import debug, info, log, make_progress_bar, trace
+from bdx import debug, get_config, info, log, make_progress_bar, trace
 
 
 class NameDemangler:
@@ -279,11 +279,15 @@ def _find_source_file_compdb(elf: ELFFile) -> Optional[Path]:
 
 
 def _find_source_file_dwarfdump(elf: ELFFile) -> Optional[Path]:
+    arch_config = get_config().arch_config(_get_arch(elf).name)
+    dwarfdump = arch_config.dwarfdump_program
+
     try:
         out = subprocess.check_output(
-            ["dwarfdump", "-r", elf.stream.name]
+            [dwarfdump, "-r", elf.stream.name]
         ).decode()
-    except Exception:
+    except Exception as e:
+        trace("{} failed for {}: {}", dwarfdump, elf.stream.name, str(e))
         return None
 
     match = re.match(
@@ -519,9 +523,11 @@ def find_symbol_definition(symbol: Symbol) -> Optional[Definition]:
     else:
         fallback = None
 
+    arch_config = get_config().arch_config(symbol.arch.name)
+
     try:
         cmd = [
-            "addr2line",
+            arch_config.addr2line_program,
             "-i",
             "-f",
             "-j",
@@ -534,7 +540,7 @@ def find_symbol_definition(symbol: Symbol) -> Optional[Definition]:
         trace("Running command: {!r}", " ".join(cmd))
         out = subprocess.check_output(cmd).decode()
     except Exception as e:
-        debug("Failed to run addr2line program on {}:", symbol.name, str(e))
+        debug("Failed to run addr2line program on {}: {}", symbol.name, str(e))
         return fallback
 
     lines = out.splitlines()

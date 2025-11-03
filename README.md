@@ -48,6 +48,12 @@ You need Xapian Python bindings, you can get them:
 
 ## Usage ##
 
+### Configuration ###
+
+The TOML config file [sample-config.toml](./sample-config.toml) contains
+an example configuration.  It can be customized and put into `~/config/bdx.toml`
+or a path to it can be specified via `--config` CLI option.
+
 ### Indexing ###
 
 To index a project that contains a `compile_commands.json` file:

@@ -63,6 +63,7 @@ def fixture_path():
 
 @pytest.fixture(autouse=True)
 def run_around_tests():
+    os.environ["_BDX_DISABLE_CONFIG"] = "1"
     # Simplify debugging by indexing in this process only for tests
     os.environ["_BDX_NO_MULTIPROCESSING"] = "1"
     os.environ["BDX_DISABLE_PROGRESS_BAR"] = "1"

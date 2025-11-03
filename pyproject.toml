@@ -22,6 +22,7 @@ dependencies = [
     "tqdm",
     "sortedcontainers",
     "wcmatch",
+    "tomli_w",
 ]
 
 [project.optional-dependencies]
@@ -66,10 +67,11 @@ select = [
 ]
 
 ignore = [
-    "D104",  # undocumented-public-package
-    "D100",  # undocumented-public-module
-    "D105",  # undocumented-magic-method
-    "I001",  # unsorted-imports
+    "D104",     # undocumented-public-package
+    "D100",     # undocumented-public-module
+    "D105",     # undocumented-magic-method
+    "I001",     # unsorted-imports
+    "PLW0603",  # global-statement
 ]
 
 unfixable = [

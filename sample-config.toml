@@ -1,0 +1,6 @@
+[arch.default]
+addr2line = "addr2line"
+dwarfdump = "dwarfdump"
+
+[arch.CUDA]
+addr2line = "/bin/false"

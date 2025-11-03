@@ -11,11 +11,21 @@ from sys import exit
 from typing import Any, Optional
 
 import click
+import tomli_w
 from click.shell_completion import CompletionItem
 from click.types import BoolParamType, IntRange
 
 import bdx
-from bdx import debug, error, info, log, make_progress_bar, trace
+from bdx import (
+    debug,
+    error,
+    get_config,
+    info,
+    load_config,
+    log,
+    make_progress_bar,
+    trace,
+)
 from bdx.binary import (
     CompilationDatabaseSource,
     Exclusion,
@@ -167,6 +177,12 @@ def _common_options(index_must_exist=False):
                 " for increased verbosity."
             ),
         )
+        @click.option(
+            "--config",
+            type=click.Path(readable=True),
+            default=None,
+            help=("Path to TOML config file."),
+        )
         @click.pass_context
         @wraps(f)
         def inner(
@@ -176,8 +192,19 @@ def _common_options(index_must_exist=False):
             index_path: str | Path,
             check_index_exists: bool,
             verbose: int,
+            config: str | Path,
             **kwargs,
         ):
+            bdx.VERBOSITY = verbose
+
+            try:
+                load_config(Path(config) if config else None)
+            except (TypeError, ValueError) as e:
+                debug("{}", e)
+                error("Error when loading config: {}", str(e))
+
+            # set it temporarily to avoid producing many useless logs here
+            bdx.VERBOSITY = 0
             did_guess_directory = False
 
             if not directory:
@@ -221,7 +248,6 @@ def _common_options(index_must_exist=False):
                 raise click.UsageError(msg)
 
             bdx.VERBOSITY = verbose
-
             if did_guess_directory:
                 info(f"note: Using {directory} as binary directory")
 
@@ -738,6 +764,14 @@ def files(_directory, index_path):
     with SymbolIndex.open(index_path, readonly=True) as index:
         for path in index.all_files():
             click.echo(path)
+
+
+@cli.command()
+@_common_options(index_must_exist=False)
+def print_config(_directory, index_path):
+    """Print the TOML config to stdout."""
+    data = get_config().to_dict()
+    print(tomli_w.dumps(data))
 
 
 @cli.command()
