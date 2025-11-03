@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import replace
 from functools import wraps
 from pathlib import Path
 from sys import exit
@@ -422,7 +423,9 @@ def index(
 
     exclusions = [Exclusion(ex) for ex in exclude]
 
-    options = IndexingOptions(**dict(opt))
+    options = IndexingOptions()
+    options.set_from_config()
+    options = replace(options, **dict(opt))
 
     try:
         stats = index_binary_directory(

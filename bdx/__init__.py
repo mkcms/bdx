@@ -104,6 +104,48 @@ def _ensure_type(what: str, obj: Any, type: Type[T]) -> T:
 
 
 @dataclass
+class IndexingConfig:
+    """Config that maps to IndexingOptions."""
+
+    demangle_names: bool = True
+    index_relocations: bool = False
+    min_symbol_size: int = 1
+    use_dwarfdump: bool = True
+
+    def set_from_dict(self, data: dict):
+        """Set the values in this config using data from given dict."""
+        for k, v in data.items():
+            match k:
+                case "demangle-names":
+                    self.demangle_names = _ensure_type(
+                        "demangle-names", v, bool
+                    )
+                case "index-relocations":
+                    self.index_relocations = _ensure_type(
+                        "index-relocations", v, bool
+                    )
+                case "min-symbol-size":
+                    self.min_symbol_size = _ensure_type(
+                        "min-symbol-size", v, int
+                    )
+                case "use-dwarfdump":
+                    self.use_dwarfdump = _ensure_type("use-dwarfdump", v, bool)
+                case _:
+                    log("Warning: unknown 'indexing' config key {!r}", k)
+
+    def to_dict(self) -> dict:
+        """Serialize this config to a dict."""
+        optnames = {
+            "demangle_names": "demangle-names",
+            "index_relocations": "index-relocations",
+            "min_symbol_size": "min-symbol-size",
+            "use_dwarfdump": "use-dwarfdump",
+        }
+        fields = dataclasses.fields(self)
+        return {optnames[f.name]: getattr(self, f.name) for f in fields}
+
+
+@dataclass
 class ArchConfig:
     """Per-arch configuration."""
 
@@ -171,6 +213,7 @@ class ArchConfig:
 class Config:
     """Holds the global configuration."""
 
+    indexing: IndexingConfig = field(default_factory=IndexingConfig)
     arch: dict[str, ArchConfig] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -187,6 +230,10 @@ class Config:
 
         for k, v in data.items():
             match k:
+                case "indexing":
+                    _ensure_type("indexing", v, dict)
+                    self.indexing.set_from_dict(v)
+
                 case "arch":
                     _ensure_type("arch", v, dict)
 
@@ -215,6 +262,7 @@ class Config:
     def to_dict(self) -> dict:
         """Serialize this config to dict."""
         return {
+            "indexing": self.indexing.to_dict(),
             "arch": {
                 **{
                     k: v.to_dict(skip_defaults=(k != "default"))

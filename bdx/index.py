@@ -31,7 +31,15 @@ from typing import (
 
 import xapian
 
-from bdx import debug, detail_log, error, log, make_progress_bar, trace
+from bdx import (
+    debug,
+    detail_log,
+    error,
+    get_config,
+    log,
+    make_progress_bar,
+    trace,
+)
 from bdx.binary import (
     Arch,
     BinaryDirectory,
@@ -59,6 +67,11 @@ class IndexingOptions:
     use_dwarfdump: bool = True
     save_filters: bool = False
     delete_saved_filters: bool = False
+
+    def set_from_config(self):
+        """Set the values in this object from the config."""
+        for k, v in asdict(get_config().indexing).items():
+            setattr(self, k, v)
 
 
 @dataclass(frozen=True)
