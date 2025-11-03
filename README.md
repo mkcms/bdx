@@ -109,9 +109,6 @@ Available options:
 After a directory is indexed, you can disassemble symbols matching a search
 query.
 
-You can set the command to disassemble with the `-D`, `--disassembler` option,
-which can contain `{}` placeholders for replacement.
-
 ```
 $ bdx disass tree node defp source:./gcc/cp/parser* section:.text
 

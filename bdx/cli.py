@@ -637,46 +637,13 @@ def search(_directory, index_path, query, num, format):
     metavar="LIMIT",
     default=None,
 )
-@click.option(
-    "-D",
-    "--disassembler",
-    help=(
-        "The command to run to disassemble a symbol. "
-        "'{}'-placeholders are replaced with search keys."
-    ),
-    nargs=1,
-    default=(
-        "objdump -dC "
-        "--no-show-raw-insn "
-        "'{path}' "
-        "--section '{section}' "
-        "--start-address 0x{address:x} --stop-address 0x{endaddress:x}"
-    ),
-    show_default=True,
-    metavar="COMMAND",
-)
-@click.option(
-    "-M",
-    "--disassembler-options",
-    help=(
-        "Additional string to append to command given by -D. "
-        "'{}'-placeholders can also be present here."
-    ),
-    nargs=1,
-    default="",
-    show_default=True,
-    metavar="OPTS",
-)
-def disass(
-    _directory, index_path, query, num, disassembler, disassembler_options
-):
+def disass(_directory, index_path, query, num):
     """Search binary directory for symbols."""
     results = search_index(
         index_path=index_path, query=" ".join(query), limit=num
     )
 
-    if disassembler_options:
-        disassembler += " " + disassembler_options
+    config = get_config()
 
     while True:
         try:
@@ -694,12 +661,13 @@ def disass(
         data.update(res.dynamic_fields())
 
         try:
-            cmd = disassembler.format(**data)
+            cmd = config.arch_config(res.symbol.arch.name).disassembly_command(
+                data
+            )
         except (KeyError, ValueError, TypeError) as e:
             error(
-                "Invalid format: {!r} in {!r}\nAvailable keys: {}",
+                "Invalid format: {!r}\nAvailable keys: {}",
                 str(e),
-                disassembler,
                 list(data.keys()),
             )
             exit(1)

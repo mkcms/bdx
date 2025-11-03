@@ -261,12 +261,12 @@ def test_cli_disassemble(monkeypatch, fixture_path, index_path):
     assert result.exit_code == 0
     assert check_call_args is not None
 
-    args, kwargs = check_call_args
+    (cmd, *_), _ = check_call_args
 
-    assert args[0].startswith("objdump")
-    assert "--section '.text'" in args[0]
+    assert cmd.startswith("objdump")
+    assert "--section '.text'" in cmd
 
-    output = subprocess.check_output(*args, **kwargs, text=True)
+    output = subprocess.check_output(cmd, text=True, shell=True)
     assert re.search("push[ ]+%rbp", output)
 
 

@@ -110,6 +110,21 @@ class ArchConfig:
     addr2line_program: str = "addr2line"
     dwarfdump_program: str = "dwarfdump"
 
+    disassembler: str = "objdump"
+    disassembler_args: str = " ".join(
+        [
+            "-dC",
+            "--no-show-raw-insn",
+            "'{path}'",
+            "--section",
+            "'{section}'",
+            "--start-address",
+            "0x{address:x}",
+            "--stop-address",
+            "0x{endaddress:x}",
+        ]
+    )
+
     def set_from_dict(self, data: dict):
         """Set the values in this config using data from given dict."""
         for k, v in data.items():
@@ -118,6 +133,12 @@ class ArchConfig:
                     self.addr2line_program = _ensure_type("addr2line", v, str)
                 case "dwarfdump":
                     self.dwarfdump_program = _ensure_type("dwarfdump", v, str)
+                case "disassembler":
+                    self.disassembler = _ensure_type("disassembler", v, str)
+                case "disassembler-args":
+                    self.disassembler_args = _ensure_type(
+                        "disassembler-args", v, str
+                    )
                 case _:
                     log("Warning: Unknown 'arch' config key {!r}", k)
 
@@ -129,6 +150,8 @@ class ArchConfig:
         optnames = {
             "addr2line_program": "addr2line",
             "dwarfdump_program": "dwarfdump",
+            "disassembler": "disassembler",
+            "disassembler_args": "disassembler-args",
         }
         fields = dataclasses.fields(self)
         return {
@@ -136,6 +159,12 @@ class ArchConfig:
             for f in fields
             if not skip_defaults or getattr(self, f.name) != f.default
         }
+
+    def disassembly_command(self, symbol_dict: dict) -> str:
+        """Get the command to disassemble Symbol (as dict) object."""
+        args = self.disassembler_args.format(**symbol_dict)
+
+        return f"{self.disassembler} {args}"
 
 
 @dataclass

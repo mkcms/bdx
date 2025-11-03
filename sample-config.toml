@@ -2,5 +2,13 @@
 addr2line = "addr2line"
 dwarfdump = "dwarfdump"
 
+disassembler = "objdump"
+disassembler-args = "-dC --no-show-raw-insn '{path}' --section '{section}' --start-address 0x{address:x} --stop-address 0x{endaddress:x}"
+
 [arch.CUDA]
 addr2line = "/bin/false"
+disassembler = "cuobjdump"
+disassembler-args = ""
+
+[arch.X86_64]
+disassembler = "objdump -M intel"
