@@ -32,6 +32,7 @@ from typing import (
 import xapian
 
 from bdx import (
+    Pretty,
     debug,
     detail_log,
     error,
@@ -651,7 +652,7 @@ class SymbolIndex:
         debug("Opened index: {}", index.path)
         debug("Index has saved binary directory: {}", index.binary_dir())
         debug("Index mtime: {}", index.mtime())
-        trace("Index schema: {}", index.schema)
+        trace("Index schema: {}", Pretty(index.schema))
 
         return index
 
@@ -1206,7 +1207,7 @@ def index_binary_directory(
 ) -> IndexingStats:
     """Index the given directory."""
     stats = IndexingStats()
-    debug("Options: {}", options)
+    debug("Options: {}", Pretty(options))
 
     if not exclusions:
         exclusions = []

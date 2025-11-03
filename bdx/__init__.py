@@ -6,6 +6,7 @@ import traceback as tb
 from dataclasses import dataclass, field
 from multiprocessing import Lock
 from pathlib import Path
+from pprint import pformat
 from typing import Any, Optional, Type, TypeVar
 
 import click
@@ -18,21 +19,31 @@ MAIN_PID = os.getpid()
 _lock = Lock()
 
 
+@dataclass
+class Pretty:
+    """Tag class used to pretty-print any object."""
+
+    obj: Any
+
+
 def log(msg, *args):
     """Print ``msg`` to stderr."""
     try:
         pid = os.getpid()
 
         def prettify_arg(arg):
-            if isinstance(arg, Path) and arg.is_absolute():
-                return os.path.relpath(arg)
-
-            if isinstance(arg, Exception):
-                return "\n".join(
-                    tb.format_exception(type(arg), arg, arg.__traceback__)
-                )
-
-            return arg
+            match arg:
+                case Pretty(arg):
+                    return pformat(arg)
+                case Path():
+                    if arg.is_absolute():
+                        return os.path.relpath(arg)
+                case Exception():
+                    return "\n".join(
+                        tb.format_exception(type(arg), arg, arg.__traceback__)
+                    )
+                case _:
+                    return arg
 
         def format_log_line(line):
             if pid != MAIN_PID:
@@ -296,11 +307,11 @@ def load_config(path: Optional[Path] = None):
     if path.exists() and os.getenv("_BDX_DISABLE_CONFIG") is None:
         with open(path, "rb") as f:
             data = tomllib.load(f)
-            trace("Parsed config: {}", data)
+            trace("Parsed config: {}", Pretty(data))
 
             cfg.set_from_dict(data)
 
-    debug("Config: {}", cfg)
+    debug("Config: {}", Pretty(cfg))
     global _CONFIG_INSTANCE
 
     _CONFIG_INSTANCE = cfg
