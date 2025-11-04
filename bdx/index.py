@@ -66,8 +66,6 @@ class IndexingOptions:
     index_relocations: bool = False
     min_symbol_size: int = 1
     use_dwarfdump: bool = True
-    save_filters: bool = False
-    delete_saved_filters: bool = False
 
     def set_from_config(self):
         """Set the values in this object from the config."""
@@ -781,17 +779,6 @@ class SymbolIndex:
         """Set the modification time of this index."""
         self.set_metadata("binary_dir", str(binary_dir).encode())
 
-    def exclusions(self) -> Collection[Exclusion]:
-        """Get exclusions for this index saved by previous indexing runs."""
-        if "__exclusions__" not in set(self.get_metadata_keys()):
-            return []
-
-        return pickle.loads(self.get_metadata("__exclusions__"))
-
-    def set_exclusions(self, exclusions: Collection[Exclusion]):
-        """Set the exclusions for this index for future indexing runs."""
-        self.set_metadata("__exclusions__", pickle.dumps(exclusions))
-
     @contextmanager
     def transaction(self):
         """Return a context manager for transactions in this SymbolIndex."""
@@ -1212,7 +1199,6 @@ def index_binary_directory(
     if not exclusions:
         exclusions = []
 
-    original_exclusions = list(exclusions)
     exclusions = list(exclusions)
 
     bindir_path = Path(directory)
@@ -1222,19 +1208,6 @@ def index_binary_directory(
     ) as index:
         if index.binary_dir() is None and not dry_run:
             index.set_binary_dir(bindir_path)
-
-        if options.delete_saved_filters:
-            for excl in index.exclusions():
-                debug("Deleting saved exclusion {}", excl)
-            if not dry_run:
-                index.set_exclusions([])
-            saved_exclusions = []
-        else:
-            saved_exclusions = list(index.exclusions())
-        for excl in saved_exclusions:
-            debug("Loading saved exclusion: {}", excl)
-            if excl not in exclusions:
-                exclusions.append(excl)
 
         if reindex:
             mtime_ns = 0
@@ -1283,11 +1256,6 @@ def index_binary_directory(
             log_unindex_file(file, is_deleted=False)
         for file in deleted_files:
             log_unindex_file(file, is_deleted=True)
-
-        if options.save_filters:
-            saved_exclusions.extend(original_exclusions)
-        if not dry_run:
-            index.set_exclusions(saved_exclusions)
 
     with (
         sigint_catcher() as interrupted,
