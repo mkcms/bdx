@@ -1196,10 +1196,12 @@ def index_binary_directory(
     stats = IndexingStats()
     debug("Options: {}", Pretty(options))
 
+    config = get_config()
+
+    configured_exclusions = [Exclusion(x) for x in config.indexing.exclude]
     if not exclusions:
         exclusions = []
-
-    exclusions = list(exclusions)
+    exclusions = configured_exclusions + list(exclusions)
 
     bindir_path = Path(directory)
 

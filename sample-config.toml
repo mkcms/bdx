@@ -3,6 +3,7 @@ demangle-names = true
 index-relocations = false
 min-symbol-size = 1
 use-dwarfdump = true
+exclude = ["**/*.so"]
 
 [arch.default]
 addr2line = "addr2line"
@@ -23,3 +24,4 @@ disassembler = "objdump -M intel"
 [path."/src/path/to/some/dir/"]
 arch.default.addr2line = "special-addr2line"
 indexing.index-relocations = true
+indexing.exclude = ["**/build/stage1-*/**"]

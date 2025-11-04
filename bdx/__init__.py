@@ -122,6 +122,7 @@ class IndexingConfig:
     index_relocations: bool = False
     min_symbol_size: int = 1
     use_dwarfdump: bool = True
+    exclude: list[str] = field(default_factory=list)
 
     def set_from_dict(self, data: dict):
         """Set the values in this config using data from given dict."""
@@ -141,6 +142,10 @@ class IndexingConfig:
                     )
                 case "use-dwarfdump":
                     self.use_dwarfdump = _ensure_type("use-dwarfdump", v, bool)
+                case "exclude":
+                    self.exclude = _ensure_type("exclude", v, list)
+                    for i, x in enumerate(v):
+                        _ensure_type(f"exclude.{i}", x, str)
                 case _:
                     log("Warning: unknown 'indexing' config key {!r}", k)
 
@@ -151,6 +156,7 @@ class IndexingConfig:
             "index_relocations": "index-relocations",
             "min_symbol_size": "min-symbol-size",
             "use_dwarfdump": "use-dwarfdump",
+            "exclude": "exclude",
         }
         fields = dataclasses.fields(self)
         return {optnames[f.name]: getattr(self, f.name) for f in fields}
