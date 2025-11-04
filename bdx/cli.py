@@ -648,6 +648,8 @@ def disass(_directory, index_path, query, num):
 
     config = get_config()
 
+    errors = False
+
     while True:
         try:
             res = next(results)
@@ -677,7 +679,15 @@ def disass(_directory, index_path, query, num):
 
         trace("Symbol: {}", res)
         debug("Running command: {}", cmd)
-        subprocess.check_call(cmd, shell=True)
+        try:
+            subprocess.check_call(cmd, shell=True)
+        except Exception as e:
+            trace("Exception: {}", e)
+            log("Error: {}: {}", res.symbol.name, str(e))
+            errors = True
+
+    if errors:
+        error("One or more commands failed")
 
 
 @cli.command()
