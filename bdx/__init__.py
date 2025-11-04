@@ -226,10 +226,21 @@ class Config:
 
     indexing: IndexingConfig = field(default_factory=IndexingConfig)
     arch: dict[str, ArchConfig] = field(default_factory=dict)
+    per_path_configs: dict[Path, dict] = field(default_factory=dict)
 
     def __post_init__(self):
         """Initialize this object after creation."""
         self.arch["default"] = ArchConfig()
+
+    def apply_path_config(self, path: Path):
+        """Apply path-specific configration for ``path``."""
+        config = self.per_path_configs.get(path)
+        if config is not None:
+            debug("Applying config for directory: {}", str(path))
+            trace("Per-directory config: {}", Pretty(config))
+            self.set_from_dict(config)
+        else:
+            debug("No directory-specific config for path: {}", str(path))
 
     def arch_config(self, arch: str) -> ArchConfig:
         """Get the per-arch config for ``arch``, or the default one."""
@@ -264,9 +275,17 @@ class Config:
                                 msg += ",\n"
 
                             raise ValueError(msg)
-                        cfg = ArchConfig()
+                        cfg = self.arch.setdefault(arch, ArchConfig())
                         cfg.set_from_dict({**default_arch_config, **archv})
-                        self.arch[arch] = cfg
+                case "path":
+                    _ensure_type("path", v, dict)
+
+                    for path, pathconfig in v.items():
+                        _ensure_type(f"path.{path}", pathconfig, dict)
+
+                        self.per_path_configs[
+                            Path(path).absolute().resolve()
+                        ] = pathconfig
                 case _:
                     log("Warning: Unknown top-level config key {!r}", k)
 
@@ -275,10 +294,8 @@ class Config:
         return {
             "indexing": self.indexing.to_dict(),
             "arch": {
-                **{
-                    k: v.to_dict(skip_defaults=(k != "default"))
-                    for k, v in self.arch.items()
-                },
+                k: v.to_dict(skip_defaults=(k != "default"))
+                for k, v in self.arch.items()
             },
         }
 

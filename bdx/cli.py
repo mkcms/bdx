@@ -255,6 +255,8 @@ def _common_options(index_must_exist=False):
             debug("Binary directory: {}", str(directory.absolute()))
             debug("PWD: {}", str(Path().absolute()))
 
+            get_config().apply_path_config(directory)
+
             f(*args, directory, index_path, **kwargs)
 
         return inner

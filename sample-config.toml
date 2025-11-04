@@ -18,3 +18,8 @@ disassembler-args = ""
 
 [arch.X86_64]
 disassembler = "objdump -M intel"
+
+# It's possible to override settings for any directory too
+[path."/src/path/to/some/dir/"]
+arch.default.addr2line = "special-addr2line"
+indexing.index-relocations = true
