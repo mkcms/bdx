@@ -100,15 +100,12 @@ def guess_index_path_for_directory(directory: str | Path) -> Path:
 
     for index_path in cache_dir.iterdir():
         try:
-            with SymbolIndex.open(index_path, readonly=True) as index:
-                binary_dir = index.binary_dir()
-                if binary_dir is None:
-                    continue
-                if binary_dir == directory:
-                    return index_path
-                if binary_dir in directory.parents:
-                    return index_path
-        except SymbolIndex.Error:
+            binary_dir = SymbolIndex.get_binary_dir(index_path)
+            if binary_dir == directory:
+                return index_path
+            if binary_dir in directory.parents:
+                return index_path
+        except Exception:
             pass
 
     return SymbolIndex.default_path(directory)

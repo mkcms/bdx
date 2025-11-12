@@ -507,6 +507,9 @@ class Schema(Mapping):
                 handler.index(document, val)
 
 
+DB_SUBDIR = "db"
+
+
 class SymbolIndex:
     """Easy interface for a xapian database, with schema support."""
 
@@ -644,7 +647,9 @@ class SymbolIndex:
 
         """
         index = SymbolIndex(
-            Path(directory) / "db", readonly=readonly, is_shard=False
+            Path(directory) / DB_SUBDIR,
+            readonly=readonly,
+            is_shard=False,
         )
 
         debug("Opened index: {}", index.path)
@@ -655,13 +660,13 @@ class SymbolIndex:
         return index
 
     @staticmethod
-    def open_shard(
-        directory: Path | str, readonly: bool = False
-    ) -> "SymbolIndex":
+    def open_shard(directory: Path | str) -> "SymbolIndex":
         """Open a writable shard for index in given directory."""
-        for path in SymbolIndex.generate_shard_paths(Path(directory) / "db"):
+        for path in SymbolIndex.generate_shard_paths(
+            Path(directory) / DB_SUBDIR
+        ):
             try:
-                return SymbolIndex(path, readonly=readonly, is_shard=True)
+                return SymbolIndex(path, readonly=False, is_shard=True)
             except Exception:
                 pass
 
@@ -680,6 +685,16 @@ class SymbolIndex:
         while True:
             yield directory.parent / f"{directory.name}.{i:0>3}"
             i += 1
+
+    @staticmethod
+    def get_binary_dir(index_path: Path | str) -> Optional[Path]:
+        """Try to get the saved binary directory for given index path."""
+        with SymbolIndex(
+            Path(index_path) / DB_SUBDIR,
+            readonly=True,
+            is_shard=True,
+        ) as index:
+            return index.binary_dir()
 
     def shards(self) -> Iterator[Path]:
         """Yield the shards of this database."""
