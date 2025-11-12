@@ -15,7 +15,7 @@ disassembler-args = "-dC --no-show-raw-insn '{path}' --section '{section}' --sta
 [arch.CUDA]
 addr2line = "/bin/false"
 disassembler = "cuobjdump"
-disassembler-args = ""
+disassembler-args = "--dump-sass '{path}' --function '{name}'"
 
 [arch.X86_64]
 disassembler = "objdump -M intel"
