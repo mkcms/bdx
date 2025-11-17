@@ -593,13 +593,16 @@ class Exclusion:
         """Return true if this exclusion pattern matches ``path``."""
         flags = glob.GLOBSTAR
         relative = path
-        if path.is_absolute():
+        if path.is_absolute() and root_dir in path.parents:
             relative = path.relative_to(root_dir)
-        return glob.globmatch(
+        match = glob.globmatch(
             path, self.pattern, root_dir=root_dir, flags=flags
-        ) or glob.globmatch(
-            relative, self.pattern, root_dir=root_dir, flags=flags
         )
+        if not match and relative:
+            match = glob.globmatch(
+                relative, self.pattern, root_dir=root_dir, flags=flags
+            )
+        return match
 
 
 class FileSource:
