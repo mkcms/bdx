@@ -66,7 +66,11 @@ Or you can specify the directory to index:
 
 Alternatively you can specify list of files to index (here with bash process substitution):
 
-    bdx index  -f <(find . -name '*.o')
+    bdx index-f <(find . -name '*.o')
+
+With the `-g` option it's possible to include even more files to index:
+
+    bdx index -c -g "/usr/lib/x86_64-linux-gnu/lib*.so*"
 
 The indexer will only index files changed since last run.  With `--exclude`
 option you can choose directories/glob patterns to ignore.

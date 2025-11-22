@@ -4,7 +4,13 @@ from pathlib import Path
 from random import shuffle
 from typing import Optional
 
-from bdx.binary import BinaryDirectory, Exclusion, NameDemangler
+from bdx.binary import (
+    BinaryDirectory,
+    CombinedSource,
+    Exclusion,
+    GlobSource,
+    NameDemangler,
+)
 
 
 def create_fake_elf_file(path: Path, mtime: Optional[datetime] = None):
@@ -75,6 +81,31 @@ def test_find_files(tmp_path):
             tmp_path / "0.o",
             tmp_path / "1.o",
             tmp_path / "subdir" / "subdir" / "2.o",
+        ]
+    )
+
+
+def test_find_files_extra_globs(tmp_path):
+    create_fake_elf_file(tmp_path / "0.o")
+    create_fake_elf_file(tmp_path / "1.o")
+    create_fake_elf_file(tmp_path / "2.so")
+    create_fake_elf_file(tmp_path / "subdir" / "1.so")
+    create_fake_elf_file(tmp_path / "subdir" / "2.o")
+
+    source1 = GlobSource(["*.o"])
+    source2 = GlobSource(["subdir/*.so"])
+    source = CombinedSource([source1, source2])
+
+    bdir = BinaryDirectory(tmp_path, source)
+    deleted_files = list(bdir.deleted_files())
+    changed_files = list(bdir.changed_files())
+
+    assert deleted_files == []
+    assert set(changed_files) == set(
+        [
+            tmp_path / "0.o",
+            tmp_path / "1.o",
+            tmp_path / "subdir" / "1.so",
         ]
     )
 

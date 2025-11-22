@@ -44,6 +44,7 @@ from bdx import (
 from bdx.binary import (
     Arch,
     BinaryDirectory,
+    CombinedSource,
     CompilationDatabaseSource,
     Exclusion,
     FileSource,
@@ -1202,6 +1203,7 @@ def index_binary_directory(
     index_path: Path,
     options: IndexingOptions,
     files: Optional[list[Path]] = None,
+    extra_globs: Optional[list[str]] = None,
     use_compilation_database: bool = False,
     reindex: bool = False,
     exclusions: Optional[Collection[Exclusion]] = None,
@@ -1217,6 +1219,11 @@ def index_binary_directory(
     if not exclusions:
         exclusions = []
     exclusions = configured_exclusions + list(exclusions)
+
+    configured_extra_globs = config.indexing.extra_globs
+    if not extra_globs:
+        extra_globs = []
+    extra_globs += configured_extra_globs + extra_globs
 
     bindir_path = Path(directory)
 
@@ -1238,7 +1245,10 @@ def index_binary_directory(
         elif files is not None:
             source = StaticFileSource(files)
         else:
-            source = GlobSource(bindir_path)
+            source = GlobSource()
+
+        if extra_globs:
+            source = CombinedSource([source, GlobSource(extra_globs)])
 
         assert source is not None
 

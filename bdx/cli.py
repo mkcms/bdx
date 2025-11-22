@@ -336,6 +336,17 @@ def cli():
         "  If it's `-`, then read it from stdin."
     ),
 )
+@click.option(
+    "-g",
+    "--extra-glob",
+    type=click.Path(),
+    multiple=True,
+    metavar="GLOB",
+    help=(
+        "Additional extra glob pattern matching files to index."
+        " Can be given multiple times."
+    ),
+)
 @click.option("-c", "--use-compilation-database", is_flag=True)
 @click.option(
     "-o",
@@ -391,6 +402,7 @@ def index(
     opt,
     use_compilation_database,
     file_list,
+    extra_glob,
     reindex,
     exclude,
     delete,
@@ -430,6 +442,7 @@ def index(
             index_path,
             options=options,
             exclusions=exclusions,
+            extra_globs=[str(x) for x in extra_glob],
             files=files,
             use_compilation_database=use_compilation_database,
             reindex=reindex,

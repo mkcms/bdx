@@ -43,6 +43,7 @@ def index_directory_with_file_list(
     index_path: Path,
     tmp_path: Path,
     file_list: list[Path],
+    extra_globs: Optional[list[str]] = None,
 ) -> Result:
     tmpfile = tmp_path / "files.txt"
     tmpfile.write_text("\n".join(map(str, file_list)))
@@ -54,6 +55,7 @@ def index_directory_with_file_list(
             str(index_path),
             "-f",
             str(tmpfile),
+            *[f"--extra-glob={g}" for g in (extra_globs or [])],
         ],
     )
 
@@ -143,6 +145,42 @@ def test_cli_indexing_with_custom_file_list(
         assert f"foo.c.o: .text: c_function: /src/subdir/foo.c" in lines
         assert not any([x.startswith("bar.cpp.o: ") for x in lines])
         assert any([x.startswith("toplev.c.o: ") for x in lines])
+
+
+def test_cli_indexing_with_extra_globs(
+    tmp_path, fixture_path, index_path, chdir
+):
+    with chdir(fixture_path):
+        runner = CliRunner()
+
+        result = index_directory_with_file_list(
+            runner,
+            index_path,
+            tmp_path,
+            [
+                Path() / "toplev.c.o",
+            ],
+            extra_globs=["*.so", "**/bar*.o"],
+        )
+        assert result.exit_code == 0
+
+        searchresult = search_directory(
+            runner,
+            index_path,
+            "-f",
+            "json",
+            "*:*",
+        )
+        assert searchresult.exit_code == 0
+
+        data = map(json.loads, searchresult.output.splitlines())
+        files = set(Path(x["path"]).name for x in data)
+
+        assert files == {
+            "toplev.c.o",
+            "bar.cpp.o",
+            "shared.c.so",
+        }
 
 
 def test_cli_search_json_output(fixture_path, index_path):

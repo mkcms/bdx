@@ -4,6 +4,7 @@ index-relocations = false
 min-symbol-size = 1
 use-dwarfdump = true
 exclude = ["**/*.so"]
+extra-globs = ["/usr/lib/x86_64-linux-gnu/libc*.so*"]
 
 [arch.default]
 addr2line = "addr2line"

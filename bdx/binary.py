@@ -612,6 +612,10 @@ class FileSource:
         """Initialize this FileSource for finding files under ``path``."""
         self.path = path or Path()
 
+    def set_path(self, path: Path):
+        """Set the root directory where this source will gather files from."""
+        self.path = path
+
     @abstractmethod
     def find_files(self) -> Iterable[Path]:
         """Return a list of files to index."""
@@ -633,10 +637,16 @@ class StaticFileSource(FileSource):
 class GlobSource(FileSource):
     """Provides a list of files by searching for globs."""
 
+    def __init__(self, glob_patterns=None):
+        """Initialize this instance using given glob patterns."""
+        if not glob_patterns:
+            glob_patterns = ["**/*.o", "**/*.so"]
+        self.glob_patterns = glob_patterns
+
     def find_files(self) -> Iterable[Path]:
         """Return a list of files to index."""
         files = glob.iglob(
-            ["**/*.o", "**/*.so"],
+            self.glob_patterns,
             root_dir=self.path,
             limit=100000000000,
             flags=glob.GLOBSTAR,
@@ -686,6 +696,29 @@ class CompilationDatabaseSource(FileSource):
         return compdb.get_all_binary_files()
 
 
+class CombinedSource(FileSource):
+    """Provides a list of files from multiple sources."""
+
+    def __init__(self, sources: list[FileSource]):
+        """Initialize this instance with given ``sources``."""
+        super().__init__()
+        self.sources = sources
+
+    def set_path(self, path):
+        """Set the root directory where this source will gather files from."""
+        super().set_path(path)
+        for source in self.sources:
+            source.set_path(path)
+
+    def find_files(self) -> Iterable[Path]:
+        """Return a list of files to index."""
+        files: set[Path] = set()
+        for source in self.sources:
+            files.update(source.find_files())
+
+        return files
+
+
 @dataclass(frozen=True)
 class BinaryDirectory:
     """Represents a directory containing zero or more binary files."""
@@ -705,7 +738,7 @@ class BinaryDirectory:
         for ex in self.exclusions:
             self._exclusion_stats[ex] = 0
 
-        self.source.path = self.path
+        self.source.set_path(self.path)
 
         self._file_list.extend(self._find_files())
 
