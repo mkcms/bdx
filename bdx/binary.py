@@ -336,55 +336,65 @@ def _read_symbols_in_file(
     use_compilation_database: bool,
     use_dwarfdump: bool,
 ) -> list[Symbol]:
-    symtab = elf.get_section_by_name(".symtab") or elf.get_section_by_name(
-        ".dynsym"
-    )
-    if symtab is None:
+    symtabs = [
+        elf.get_section_by_name(".symtab"),
+        elf.get_section_by_name(".dynsym"),
+    ]
+
+    if all([x is None for x in symtabs]):
         log("warning: {}: .symtab and .dynsym sections not found", file)
         return []
-    if not isinstance(symtab, SymbolTableSection):
-        msg = f"{symtab.name} is not a SymbolTableSection"
-        raise RuntimeError(msg)
-
-    arch = _get_arch(elf)
-
-    mtime = os.stat(elf.stream.fileno()).st_mtime_ns
-    source = _find_source_file(
-        elf,
-        use_compilation_database,
-        use_dwarfdump,
-    )
-
-    demangler = NameDemangler.instance()
 
     symbols = []
-    for symbol in symtab.iter_symbols():
-        size = symbol["st_size"]
-        if size < min_symbol_size:
+
+    for symtab in symtabs:
+        if symtab is None:
             continue
 
-        try:
-            section = elf.get_section(symbol["st_shndx"]).name
-        except Exception:
-            section = ""
+        if not isinstance(symtab, SymbolTableSection):
+            msg = f"{symtab.name} is not a SymbolTableSection"
+            raise RuntimeError(msg)
 
-        demangled = demangler.demangle(symbol.name) if demangle_names else None
+        arch = _get_arch(elf)
 
-        symbols.append(
-            Symbol(
-                arch=arch,
-                path=Path(file),
-                source=source,
-                name=symbol.name,
-                demangled=demangled,
-                section=section,
-                address=symbol["st_value"],
-                size=size,
-                type=SymbolType.of_elf_symbol(symbol),
-                relocations=list(),
-                mtime=mtime,
-            )
+        mtime = os.stat(elf.stream.fileno()).st_mtime_ns
+        source = _find_source_file(
+            elf,
+            use_compilation_database,
+            use_dwarfdump,
         )
+
+        demangler = NameDemangler.instance()
+
+        for symbol in symtab.iter_symbols():
+            size = symbol["st_size"]
+            if size < min_symbol_size:
+                continue
+
+            try:
+                section = elf.get_section(symbol["st_shndx"]).name
+            except Exception:
+                section = ""
+
+            demangled = (
+                demangler.demangle(symbol.name) if demangle_names else None
+            )
+
+            symbols.append(
+                Symbol(
+                    arch=arch,
+                    path=Path(file),
+                    source=source,
+                    name=symbol.name,
+                    demangled=demangled,
+                    section=section,
+                    address=symbol["st_value"],
+                    size=size,
+                    type=SymbolType.of_elf_symbol(symbol),
+                    relocations=list(),
+                    mtime=mtime,
+                )
+            )
 
     return symbols
 

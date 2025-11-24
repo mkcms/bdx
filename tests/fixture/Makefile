@@ -15,7 +15,8 @@ SHARED_OBJFILES := shared.c.so
 	${CC} ${CFLAGS} -g -c -o $@ $^
 
 %.c.so: %.c
-	${CC} ${CFLAGS} -shared -g -o $@ $^
+	${CC} ${CFLAGS} -shared -o $@ $^
+	strip $@
 
 %.cpp.o: %.cpp
 	${CXX} ${CFLAGS} -g -c -o $@ $^
