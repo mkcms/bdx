@@ -791,3 +791,26 @@ def test_tokenize_symbol():
             "vv",
         ]
     )
+
+    tokens = SymbolNameField.tokenize_value(
+        "std::basic_string<wchar_t, std::char_traits<wchar_t>, std::allocator<wchar_t> >::_Rep::_M_destroy(std::allocator<wchar_t> const&)"
+    )
+    assert tokens == set(
+        [
+            "Rep",
+            "_M_destroy",
+            "_Rep",
+            "allocator",
+            "basic",
+            "basic_string",
+            "char",
+            "char_traits",
+            "const",
+            "destroy",
+            "ep",
+            "std",
+            "string",
+            "traits",
+            "wchar",
+        ]
+    )

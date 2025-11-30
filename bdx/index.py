@@ -309,6 +309,9 @@ class SymbolNameField(TextField):
         # Find lowercase words
         lower_case_words = re.findall("[a-z]{2,}", " ".join(letters_only))
 
+        # Symbol names after '::' (C++)
+        unqualified_symbols = re.findall("::(\\w+)", value)
+
         numbers = re.findall("[0-9]+", value)
         words_with_numbers = re.findall("[a-zA-Z]+[0-9]+", value)
 
@@ -320,6 +323,7 @@ class SymbolNameField(TextField):
             lower_case_words,
             numbers,
             words_with_numbers,
+            unqualified_symbols,
         ]:
             tokens.update(tokenlist)
 
